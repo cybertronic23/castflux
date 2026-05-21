@@ -23,7 +23,7 @@ def main():
     logger.info("=" * 50)
     logger.info("CastFlux 启动")
 
-    check_prerequisites()
+    check_prerequisites(args.llm_provider)
 
     video_path = Path(args.video)
     if not video_path.exists():
@@ -53,7 +53,12 @@ def main():
 
         qa_blocks = find_qa_blocks(segments, target_count=args.num_slices)
 
-        metas = batch_generate(qa_blocks, max_workers=args.llm_workers)
+        metas = batch_generate(
+            qa_blocks,
+            max_workers=args.llm_workers,
+            provider=args.llm_provider,
+            model=args.llm_model,
+        )
 
         titles = slice_all_blocks(
             str(video_path), output_dir, qa_blocks, metas,

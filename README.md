@@ -139,8 +139,13 @@ uv run pip install -e .
 # 5. 验证安装
 castflux --help
 
-# 6. 设置环境变量
-export OPENAI_API_KEY="sk-..."
+# 6. 设置环境变量 (根据 LLM 提供商选择其一)
+export DEEPSEEK_API_KEY="sk-..."     # DeepSeek (默认)
+# export QWEN_API_KEY="sk-..."       # 阿里通义千问
+# export GLM_API_KEY="sk-..."        # 智谱 GLM
+# export MINIMAX_API_KEY="sk-..."   # MiniMax
+# export OPENAI_API_KEY="sk-..."    # OpenAI
+
 export HF_TOKEN="hf_..."
 ```
 
@@ -177,15 +182,37 @@ uv run python3 -m castflux input_video.mp4 -o slices
 | `--model` | `large-v3` | Whisper 模型大小 |
 | `--num-slices` | `10` | 输出切片数量 |
 | `--speed` | `1.3` | 视频加速倍率 |
+| `--llm-provider` | `deepseek` | LLM 提供商: `deepseek` / `qwen` / `glm` / `minimax` / `openai` |
+| `--llm-model` | (各提供商默认) | LLM 模型名, 如 `deepseek-chat` / `qwen-plus` / `glm-4-plus` |
 | `--llm-workers` | `5` | LLM 并发数 |
 | `--keep-audio` | — | 保留临时音频文件 |
 | `--verbose` | — | DEBUG 级别日志 |
 
+### LLM 提供商
+
+支持多厂商 OpenAI 兼容 API, 可通过环境变量或 `--llm-provider` 切换:
+
+| 提供商 | 环境变量 | 默认模型 | 备注 |
+|--------|----------|----------|------|
+| **DeepSeek** (默认) | `DEEPSEEK_API_KEY` | `deepseek-chat` | 推荐 DeepSeek V4 |
+| 阿里 Qwen | `QWEN_API_KEY` | `qwen-plus` | 通义千问 |
+| 智谱 GLM | `GLM_API_KEY` | `glm-4-plus` | ChatGLM |
+| MiniMax | `MINIMAX_API_KEY` | `minimax-text-01` | 小米 MiMo |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` | 回退方案 |
+
+如需自定义模型名, 设置 `--llm-model` 或 `LLM_MODEL` 环境变量。
+
 ### 示例
 
 ```bash
-# 基本用法
+# 基本用法 (默认 DeepSeek)
 castflux live_2025_01_15.mp4
+
+# 使用通义千问
+castflux live.mp4 --llm-provider qwen
+
+# 使用 DeepSeek 指定模型
+castflux live.mp4 --llm-provider deepseek --llm-model deepseek-chat
 
 # 快速试验: tiny 模型 + 3 个切片
 castflux test_clip.mp4 --model tiny --num-slices 3
@@ -269,7 +296,7 @@ slices/
 | 错误 | 原因 | 解决 |
 |------|------|------|
 | `ffmpeg 未安装` | 系统缺 ffmpeg | `brew install ffmpeg` |
-| `OPENAI_API_KEY 未设置` | 缺 API key | `export OPENAI_API_KEY=sk-...` |
+| `DEEPSEEK_API_KEY 未设置` | 缺 API key | 设置对应提供商的环境变量, 见 LLM 提供商表格 |
 | `HF_TOKEN 未设置` | 缺 HuggingFace token | 见配置说明 |
 | `说话人分离失败` | token 未授权 | 检查是否已接受模型协议 |
 | `无 QA 对` | 无双人对话 / 声纹不准确 | 检查视频内容 |
@@ -277,9 +304,18 @@ slices/
 
 ### 本地 LLM 替代
 
+CastFlux 使用 OpenAI 兼容 API, 任何提供此接口的本地服务都可接入:
+
 ```bash
+# Ollama
+export LLM_PROVIDER=openai
 export OPENAI_BASE_URL="http://localhost:11434/v1"
 export OPENAI_API_KEY="ollama"
+
+# vLLM / TGI
+export LLM_PROVIDER=openai
+export OPENAI_BASE_URL="http://localhost:8000/v1"
+export OPENAI_API_KEY="sk-xxx"
 ```
 
 ### 缓存清理

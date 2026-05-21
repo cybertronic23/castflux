@@ -26,12 +26,70 @@ SYSTEM_PROMPT = """你是一个短视频运营专家，擅长将直播中的问�
   "teaser": "前情提要文字"
 }"""
 
+PROVIDER_CONFIG = {
+    "deepseek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "default_model": "deepseek-chat",
+        "api_key_env": "DEEPSEEK_API_KEY",
+    },
+    "qwen": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "default_model": "qwen-plus",
+        "api_key_env": "QWEN_API_KEY",
+    },
+    "glm": {
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "default_model": "glm-4-plus",
+        "api_key_env": "GLM_API_KEY",
+    },
+    "minimax": {
+        "base_url": "https://api.minimax.chat/v1",
+        "default_model": "minimax-text-01",
+        "api_key_env": "MINIMAX_API_KEY",
+    },
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "default_model": "gpt-4o-mini",
+        "api_key_env": "OPENAI_API_KEY",
+    },
+}
 
-def _call_llm(block_text: str, client: OpenAI) -> dict:
+DEFAULT_PROVIDER = "deepseek"
+
+
+def resolve_llm_config(provider: str | None = None, model: str | None = None) -> dict:
+    provider = provider or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER
+    provider = provider.lower()
+
+    cfg = PROVIDER_CONFIG.get(provider)
+    if not cfg:
+        available = ", ".join(PROVIDER_CONFIG)
+        logger.warning(f"未知 provider '{provider}'，可用: {available}，回退到 {DEFAULT_PROVIDER}")
+        cfg = PROVIDER_CONFIG[DEFAULT_PROVIDER]
+
+    api_key = os.environ.get(cfg["api_key_env"]) or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        logger.error(
+            f"缺少 API key: 请设置 {cfg['api_key_env']} 环境变量\n"
+            f"  你也可以设置 OPENAI_API_KEY 作为通用回退"
+        )
+        raise RuntimeError(f"未找到 {cfg['api_key_env']} 环境变量")
+
+    resolved_model = model or os.environ.get("LLM_MODEL") or cfg["default_model"]
+
+    logger.info(f"  LLM provider: {provider}, model: {resolved_model}")
+    return {
+        "api_key": api_key,
+        "base_url": cfg["base_url"],
+        "model": resolved_model,
+    }
+
+
+def _call_llm(block_text: str, client: OpenAI, model: str) -> dict:
     for attempt in range(3):
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[{"role": "user", "content": SYSTEM_PROMPT + "\n\n" + block_text}],
                 temperature=0.7,
                 max_tokens=300,
@@ -61,14 +119,20 @@ def _call_llm(block_text: str, client: OpenAI) -> dict:
     }
 
 
-def batch_generate(blocks: list[dict], max_workers: int = 5) -> list[dict]:
+def batch_generate(
+    blocks: list[dict],
+    max_workers: int = 5,
+    provider: str | None = None,
+    model: str | None = None,
+) -> list[dict]:
     logger.info(f"步骤5/6: 生成标题和提要 (并发 {max_workers})...")
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=30)
+    llm_cfg = resolve_llm_config(provider, model)
+    client = OpenAI(api_key=llm_cfg["api_key"], base_url=llm_cfg["base_url"], timeout=30)
 
     results = [None] * len(blocks)
 
     def task(i: int, block: dict) -> tuple[int, dict]:
-        return i, _call_llm(block["full_text"], client)
+        return i, _call_llm(block["full_text"], client, llm_cfg["model"])
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {pool.submit(task, i, b): i for i, b in enumerate(blocks)}

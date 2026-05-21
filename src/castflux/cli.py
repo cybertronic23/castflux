@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from castflux.llm import PROVIDER_CONFIG, DEFAULT_PROVIDER
+
 logger = logging.getLogger("castflux")
 
 
@@ -17,16 +19,29 @@ def setup_logging(verbose: bool = False):
     )
 
 
-def check_prerequisites():
+def check_prerequisites(provider: str | None = None):
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.error("ffmpeg 未安装，请先安装: brew install ffmpeg / apt install ffmpeg")
         sys.exit(1)
 
-    if not os.environ.get("OPENAI_API_KEY"):
-        logger.error("请设置 OPENAI_API_KEY 环境变量")
-        sys.exit(1)
+    provider = provider or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER
+    cfg = PROVIDER_CONFIG.get(provider.lower())
+
+    if cfg:
+        api_key = os.environ.get(cfg["api_key_env"]) or os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            logger.error(
+                f"请设置环境变量 %s (或回退 %s)",
+                cfg["api_key_env"],
+                "OPENAI_API_KEY",
+            )
+            sys.exit(1)
+    else:
+        if not os.environ.get("OPENAI_API_KEY"):
+            logger.error("请设置 OPENAI_API_KEY 环境变量")
+            sys.exit(1)
 
     if not os.environ.get("HF_TOKEN"):
         logger.error(
@@ -57,14 +72,19 @@ def resolve_font_path() -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    available = ", ".join(PROVIDER_CONFIG)
     parser = argparse.ArgumentParser(
         description="CastFlux - 直播内容切片流水线",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
+            "LLM 提供商:\n"
+            "  默认 deepseek (需设置 DEEPSEEK_API_KEY)\n"
+            "  qwen (QWEN_API_KEY)  |  glm (GLM_API_KEY)\n"
+            "  minimax (MINIMAX_API_KEY)  |  openai (OPENAI_API_KEY)\n\n"
             "示例:\n"
             "  castflux live.mp4 -o slices\n"
-            "  castflux live.mp4 --model medium --num-slices 5\n"
-            "  castflux live.mp4 --speed 1.5\n"
+            "  castflux live.mp4 --llm-provider qwen\n"
+            "  castflux live.mp4 --llm-provider deepseek --llm-model deepseek-chat\n"
         ),
     )
     parser.add_argument("video", help="输入 MP4 视频文件路径")
@@ -72,6 +92,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", default="large-v3", help="Whisper 模型大小 (默认: large-v3)")
     parser.add_argument("--num-slices", type=int, default=10, help="输出切片数量 (默认: 10)")
     parser.add_argument("--speed", type=float, default=1.3, help="视频加速倍率 (默认: 1.3)")
+    parser.add_argument("--llm-provider", default=None, help=f"LLM 提供商 ({available}), 默认: {DEFAULT_PROVIDER}, 也支持 LLM_PROVIDER 环境变量")
+    parser.add_argument("--llm-model", default=None, help="LLM 模型名 (如 deepseek-chat, qwen-plus), 也支持 LLM_MODEL 环境变量")
     parser.add_argument("--llm-workers", type=int, default=5, help="LLM 并发数 (默认: 5)")
     parser.add_argument("--keep-audio", action="store_true", help="保留临时音频文件")
     parser.add_argument("--verbose", action="store_true", help="详细日志")
