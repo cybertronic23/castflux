@@ -185,3 +185,6 @@ __marimo__/
 # CastFlux
 temp_audio.wav
 .DS_Store
+
+# 测试数据
+test_data/

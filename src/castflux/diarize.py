@@ -19,7 +19,10 @@ def diarize_audio(audio_path: str) -> list[dict]:
     if torch.cuda.is_available():
         pipeline.to(torch.device("cuda"))
 
-    diarization = pipeline(audio_path)
+    result = pipeline(audio_path)
+
+    # pyannote 4.x returns DiarizeOutput, 3.x returns Annotation directly
+    diarization = result.speaker_diarization if hasattr(result, "speaker_diarization") else result
 
     speaker_turns = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
