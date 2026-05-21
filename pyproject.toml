@@ -1,0 +1,12 @@
+[project]
+name = "castflux"
+version = "1.0.0"
+description = "直播内容切片流水线——自动提取问答片段，生成爆款短视频"
+requires-python = ">=3.10"
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "pyannote.audio>=3.1.0",
+    "torch>=2.0.0",
+    "openai>=1.0.0",
+    "tqdm>=4.0.0",
+]
