@@ -66,18 +66,16 @@
 
 ### 模块职责
 
-| 函数 | 职责 | 输入 | 输出 |
-|------|------|------|------|
-| `extract_audio` | ffmpeg 音频提取 | 视频路径 | WAV 文件路径 |
-| `transcribe_audio` | whisper 语音转文字 | WAV 路径 | `words[]` (含 start/end/word) |
-| `diarize_audio` | pyannote 说话人分离 | WAV 路径 | `speaker_turns[]` (含 start/end/speaker) |
-| `assign_speakers_to_words` | 词级标签对齐 | words + turns | 带 speaker 的 words |
-| `build_speaker_segments` | 同说话人合并 | 带标签 words | `segments[]` |
-| `find_qa_blocks` | 识别 QA 闭环 | segments | `qa_blocks[]` |
-| `_call_llm` / `batch_generate` | LLM 批量生成标题/提要 | qa_blocks | `metas[]` |
-| `_process_single_block` | 单块切片+加速+叠加 | block + meta | MP4 文件 |
-| `slice_all_blocks` | 并发处理所有块 | — | `titles[]` |
-| `save_manifest` | 保存标题清单 | titles | titles.json + titles.txt |
+| 模块 | 职责 | 暴露的函数 |
+|------|------|-------------|
+| `audio.py` | ffmpeg 音频提取 | `extract_audio` |
+| `transcribe.py` | faster-whisper 语音转文字 | `transcribe_audio` |
+| `diarize.py` | pyannote 说话人分离 + 词级对齐 | `diarize_audio`, `assign_speakers_to_words`, `build_speaker_segments` |
+| `qa.py` | QA 对识别与排序 | `find_qa_blocks` |
+| `llm.py` | LLM 批量生成标题/前情提要 | `batch_generate` |
+| `slice.py` | ffmpeg 切片 + 加速 + 叠加 + 清单保存 | `slice_all_blocks`, `save_manifest` |
+| `cli.py` | 参数解析 + 前置检查 + 字体检测 | `build_parser`, `check_prerequisites`, `resolve_font_path` |
+| `pipeline.py` | 主流程编排 | `main` (CLI 入口) |
 
 ---
 
@@ -85,26 +83,27 @@
 
 ```
 castflux/
-├── main.py              # 主程序入口 (586 行)
-│                          - 6 个处理步骤
-│                          - argparse CLI 接口
-│                          - 并发框架 (ThreadPoolExecutor)
-│                          - 完整错误处理 + 日志
+├── src/
+│   └── castflux/             # 核心包
+│       ├── __init__.py       # 版本信息 (__version__)
+│       ├── __main__.py       # python -m castflux 入口
+│       ├── cli.py            # CLI 参数解析 + 前置检查 + 字体检测
+│       ├── audio.py          # 步骤1: ffmpeg 音频提取
+│       ├── transcribe.py     # 步骤2: faster-whisper 语音转文字
+│       ├── diarize.py        # 步骤3: pyannote 说话人分离 + 词级对齐
+│       ├── qa.py             # 步骤4: QA 对识别与排序
+│       ├── llm.py            # 步骤5: LLM 批量生成标题/前情提要
+│       ├── slice.py          # 步骤6: ffmpeg 切片 + 加速 + 叠加文字
+│       └── pipeline.py       # 主流程编排 (CLI 入口)
 │
-├── pyproject.toml       # UV 项目配置
-│                          - 依赖: faster-whisper, pyannote.audio, torch, openai, tqdm
-│                          - 声明 Python >= 3.10
+├── tests/                    # 单元测试
+│   ├── __init__.py
+│   └── test_qa.py
 │
-├── README.md            # 本文档
-│
-├── uv.lock              # UV 依赖锁文件 (自动生成)
-│                          - 固定 106 个传递依赖版本
-│                          - 确保环境一致
-│
-└── .venv/               # Python 虚拟环境 (自动生成)
-     ├── bin/            # 可执行文件
-     ├── lib/            # 已安装的 106 个包
-     └── pyvenv.cfg      # 环境配置
+├── pyproject.toml            # 项目配置 + CLI 入口声明
+├── README.md                 # 本文档
+├── uv.lock                   # 依赖锁文件
+└── .venv/                    # 虚拟环境 (自动生成)
 ```
 
 ---
@@ -134,13 +133,13 @@ cd castflux
 # 3. 用 UV 创建虚拟环境并安装依赖 (~5-15 min)
 uv sync
 
-# 4. 验证安装
-uv run python3 -c "
-import torch, faster_whisper, pyannote.audio, openai
-print('所有依赖安装成功')
-"
+# 4. 安装 CastFlux 到当前环境 (开发模式)
+uv run pip install -e .
 
-# 5. 设置环境变量
+# 5. 验证安装
+castflux --help
+
+# 6. 设置环境变量
 export OPENAI_API_KEY="sk-..."
 export HF_TOKEN="hf_..."
 ```
@@ -159,8 +158,14 @@ export HF_TOKEN="hf_..."
 
 ### 基本用法
 
+提供两种运行方式:
+
 ```bash
-uv run python3 main.py input_video.mp4 -o slices
+# 方式一: 命令行工具 (推荐)
+castflux input_video.mp4 -o slices
+
+# 方式二: 模块直接运行
+uv run python3 -m castflux input_video.mp4 -o slices
 ```
 
 ### 完整参数
@@ -180,16 +185,16 @@ uv run python3 main.py input_video.mp4 -o slices
 
 ```bash
 # 基本用法
-uv run python3 main.py live_2025_01_15.mp4
+castflux live_2025_01_15.mp4
 
 # 快速试验: tiny 模型 + 3 个切片
-uv run python3 main.py test_clip.mp4 --model tiny --num-slices 3
+castflux test_clip.mp4 --model tiny --num-slices 3
 
 # 自定义: 5 切片, 1.5x 倍速
-uv run python3 main.py live.mp4 -o output --num-slices 5 --speed 1.5
+castflux live.mp4 -o output --num-slices 5 --speed 1.5
 
 # 详细日志
-uv run python3 main.py live.mp4 --verbose
+castflux live.mp4 --verbose
 ```
 
 ### 运行日志示例
