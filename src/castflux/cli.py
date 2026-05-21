@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import torch
+
 from castflux.llm import PROVIDER_CONFIG, DEFAULT_PROVIDER
 
 logger = logging.getLogger("castflux")
@@ -23,7 +25,7 @@ def check_prerequisites(provider: str | None = None):
     try:
         subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        logger.error("ffmpeg 未安装，请先安装: brew install ffmpeg / apt install ffmpeg")
+        logger.error("ffmpeg 未安装，请先安装: brew install ffmpeg / apt install ffmpeg / choco install ffmpeg")
         sys.exit(1)
 
     provider = provider or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER
@@ -60,6 +62,9 @@ def resolve_font_path() -> str:
         "/System/Library/Fonts/PingFang.ttc",
         "/System/Library/Fonts/Helvetica.ttc",
         "/System/Library/Fonts/HelveticaNeue.ttc",
+        "C:\\Windows\\Fonts\\msyh.ttc",
+        "C:\\Windows\\Fonts\\simhei.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
@@ -68,11 +73,13 @@ def resolve_font_path() -> str:
         if os.path.exists(path):
             return path
     logger.warning("未找到系统字体，drawtext 可能失败")
-    return "/System/Library/Fonts/Helvetica.ttc"
+    return "C:\\Windows\\Fonts\\arial.ttf" if sys.platform == "win32" else "/System/Library/Fonts/Helvetica.ttc"
 
 
 def build_parser() -> argparse.ArgumentParser:
     available = ", ".join(PROVIDER_CONFIG)
+    has_gpu = torch.cuda.is_available()
+    default_model = "large-v3" if has_gpu else "base"
     parser = argparse.ArgumentParser(
         description="CastFlux - 直播内容切片流水线",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -89,7 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("video", help="输入 MP4 视频文件路径")
     parser.add_argument("-o", "--output", default="output_slices", help="输出目录 (默认: output_slices)")
-    parser.add_argument("--model", default="large-v3", help="Whisper 模型大小 (默认: large-v3)")
+    parser.add_argument("--model", default="auto", help=f"Whisper 模型大小 (默认: auto, 有 GPU→large-v3, 无 GPU→base; 可选: tiny/base/small/medium/large-v3)")
     parser.add_argument("--num-slices", type=int, default=10, help="输出切片数量 (默认: 10)")
     parser.add_argument("--speed", type=float, default=1.3, help="视频加速倍率 (默认: 1.3)")
     parser.add_argument("--llm-provider", default=None, help=f"LLM 提供商 ({available}), 默认: {DEFAULT_PROVIDER}, 也支持 LLM_PROVIDER 环境变量")

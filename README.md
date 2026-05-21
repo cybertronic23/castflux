@@ -83,32 +83,31 @@
 
 ```
 castflux/
-├── src/
-│   └── castflux/             # 核心包
-│       ├── __init__.py       # 版本信息 (__version__)
-│       ├── __main__.py       # python -m castflux 入口
-│       ├── cli.py            # CLI 参数解析 + 前置检查 + 字体检测
-│       ├── audio.py          # 步骤1: ffmpeg 音频提取
-│       ├── transcribe.py     # 步骤2: faster-whisper 语音转文字
-│       ├── diarize.py        # 步骤3: pyannote 说话人分离 + 词级对齐
-│       ├── qa.py             # 步骤4: QA 对识别与排序
-│       ├── llm.py            # 步骤5: LLM 批量生成标题/前情提要
-│       ├── slice.py          # 步骤6: ffmpeg 切片 + 加速 + 叠加文字
-│       └── pipeline.py       # 主流程编排 (CLI 入口)
-│
+├── src/castflux/             # 核心包 (9 个模块)
 ├── tests/                    # 单元测试
-│   ├── __init__.py
-│   └── test_qa.py
-│
-├── pyproject.toml            # 项目配置 + CLI 入口声明
-├── README.md                 # 本文档
-├── uv.lock                   # 依赖锁文件
-└── .venv/                    # 虚拟环境 (自动生成)
+├── scripts/
+│   ├── setup.ps1             # Windows 一键安装脚本
+│   ├── setup.sh              # macOS/Linux 一键安装脚本
+│   └── castflux.bat          # Windows 快捷运行脚本
+├── Dockerfile                # 容器化部署
+├── docker-compose.yml        # Docker Compose 配置
+├── pyproject.toml             # 项目配置 + CLI 入口
+├── README.md
+├── uv.lock
+└── .venv/
 ```
 
 ---
 
 ## 安装部署
+
+跨平台推荐路径对比:
+
+| 平台 | 推荐方式 | 特点 |
+|------|----------|------|
+| **macOS / Linux** | 一键脚本或手动安装 | 原生性能 |
+| **Windows** | 一键 PowerShell 脚本 | 自动配置环境 |
+| **任何平台** | Docker (推荐给非技术用户) | 零环境配置 |
 
 ### 前置环境要求
 
@@ -118,14 +117,55 @@ castflux/
 | UV | >= 0.4.0 | 依赖管理 |
 | ffmpeg | >= 4.x | 音视频处理 |
 | HuggingFace Token | 需接受 pyannote 协议 | 下载说话人分离模型 |
-| OpenAI API Key | 有效 | 调用 GPT-4o-mini 生成标题 |
+| LLM API Key | 有效 | 调用 AI 生成标题 (DeepSeek/Qwen/GLM 等) |
 
-### 安装步骤
+### 方式一: 一键脚本 (推荐)
+
+**Windows (PowerShell)**:
+```powershell
+# 以管理员身份运行 PowerShell, 执行:
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm https://raw.githubusercontent.com/cybertronic23/castflux/main/scripts/setup.ps1 | iex
+```
+
+**macOS / Linux**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/cybertronic23/castflux/main/scripts/setup.sh | bash
+```
+
+脚本会自动: 安装 ffmpeg → 安装 uv → 克隆仓库 → 安装依赖。
+
+### 方式二: Docker 容器 (零环境配置)
+
+适合 Windows 用户不想折腾 Python 环境, 或需要隔离运行:
+
+```bash
+# 1. 创建 .env 文件 (只需填下面两个)
+cat > .env << EOF
+HF_TOKEN=hf_...
+DEEPSEEK_API_KEY=sk-...
+EOF
+
+# 2. 把视频放 input/ 目录
+mkdir -p input output
+cp your_video.mp4 input/
+
+# 3. 运行 (模型首次下载会自动缓存)
+docker compose run --rm -e VIDEO=your_video.mp4 castflux
+
+# 4. 查看结果
+ls output/
+```
+
+首次运行会下载模型 (~200MB-3GB 取决于模型), 缓存到 Docker volume 中, 下次复用。
+
+### 方式三: 手动安装
 
 ```bash
 # 1. 安装 ffmpeg
 brew install ffmpeg              # macOS
 sudo apt install ffmpeg          # Ubuntu/Debian
+winget install Gyan.FFmpeg       # Windows (需管理员)
 
 # 2. 进入项目目录
 cd castflux
@@ -133,13 +173,13 @@ cd castflux
 # 3. 用 UV 创建虚拟环境并安装依赖 (~5-15 min)
 uv sync
 
-# 4. 安装 CastFlux 到当前环境 (开发模式)
-uv run pip install -e .
+# 4. 安装 CastFlux 到当前环境
+uv pip install -e .
 
 # 5. 验证安装
 castflux --help
 
-# 6. 设置环境变量 (根据 LLM 提供商选择其一)
+# 6. 设置环境变量 (选一个你有的)
 export DEEPSEEK_API_KEY="sk-..."     # DeepSeek (默认)
 # export QWEN_API_KEY="sk-..."       # 阿里通义千问
 # export GLM_API_KEY="sk-..."        # 智谱 GLM
@@ -286,10 +326,16 @@ slices/
 
 缓存至 `~/.cache/huggingface/` 和 `~/.cache/whisper/`。
 
-### GPU 加速
+### GPU 加速 / CPU 优化
 
-- large-v3 推荐 ≥6GB VRAM；CPU 可跑但慢 (2.5h 视频约需 1-2h 转写)
-- 降级使用 `--model medium` 或 `--model small` 可显著降低资源
+- **有 GPU**: 自动使用 large-v3 模型 (推荐 ≥6GB VRAM)
+- **无 GPU** (Windows 笔记本常见): 自动回退到 base 模型, 约 200MB 下载量, 速度可接受
+- 若 CPU 仍太慢, 可手动指定更小的模型:
+  ```bash
+  castflux video.mp4 --model tiny    # 最快, ~100MB
+  castflux video.mp4 --model base    # 默认 CPU 模式, ~200MB
+  castflux video.mp4 --model small   # 平衡, ~500MB
+  ```
 
 ### 常见错误
 

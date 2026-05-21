@@ -5,8 +5,19 @@ from faster_whisper import WhisperModel
 
 logger = logging.getLogger("castflux")
 
+# GPU 可用时的默认模型, CPU 用更小的
+def _resolve_model(model_size: str | None) -> str:
+    if model_size and model_size != "auto":
+        return model_size
+    if torch.cuda.is_available():
+        logger.info("  检测到 GPU, 使用 large-v3 模型")
+        return "large-v3"
+    logger.info("  未检测到 GPU, 使用 base 模型 (CPU 推荐)")
+    return "base"
 
-def transcribe_audio(audio_path: str, model_size: str = "large-v3") -> list[dict]:
+
+def transcribe_audio(audio_path: str, model_size: str | None = "auto") -> list[dict]:
+    model_size = _resolve_model(model_size)
     logger.info(f"步骤2/6: 语音转文字 (模型: {model_size})...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
     compute_type = "float16" if device == "cuda" else "int8"
