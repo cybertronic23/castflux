@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 castflux = "castflux.pipeline:main"
+castflux-gui = "castflux.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

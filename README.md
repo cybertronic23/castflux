@@ -87,9 +87,10 @@ castflux/
 ├── src/castflux/             # 核心包 (9 个模块)
 ├── tests/                    # 单元测试
 ├── scripts/
-│   ├── setup.ps1             # Windows 一键安装脚本
+│   ├── setup_gui.bat         # Windows 一键安装（自动装 Python/UV/ffmpeg）
+│   ├── run_gui.bat           # Windows 双击启动 GUI
 │   ├── setup.sh              # macOS/Linux 一键安装脚本
-│   └── castflux.bat          # Windows 快捷运行脚本
+│   └── castflux.bat          # Windows CLI 快捷运行脚本
 ├── test_data/                # 测试数据 (已 .gitignore)
 │   ├── test_guide.md         # 完整测试流程文档
 │   ├── scripts/              # 测试生成脚本
@@ -109,13 +110,35 @@ castflux/
 
 ## 安装部署
 
-跨平台推荐路径对比:
+### Windows 用户: 傻瓜式一键安装（什么都不用管）
+
+> 只需双击一个文件，Python、ffmpeg、全部依赖自动装好，无需任何手动操作。
+
+```text
+步骤 1:  双击 scripts/setup_gui.bat （只需运行一次）
+          ↓
+     自动检测/安装 Python 3.13
+     自动安装 UV 包管理器
+     自动下载 ffmpeg 并解压
+     自动安装 CastFlux 所有依赖
+     自动在桌面创建 CastFlux 快捷方式
+          ↓
+步骤 2:  双击桌面 "CastFlux" 图标 （以后每次都双击这个）
+```
+
+**没有任何安装步骤需要你手动操作**。如果提示防火墙/杀毒，选择"允许"即可。
+
+> ⚠ 第一次启动后，点界面右上角"设置"按钮，填入 `HF_TOKEN` 和 `DEEPSEEK_API_KEY`。
+> 不知道怎么获取？详见 [HuggingFace Token 配置](#huggingface-token-配置) 和 [LLM 提供商](#llm-提供商)。
+
+---
+
+### 其他安装方式（供参考）
 
 | 平台 | 推荐方式 | 特点 |
 |------|----------|------|
 | **macOS / Linux** | 一键脚本或手动安装 | 原生性能 |
-| **Windows** | 一键 PowerShell 脚本 | 自动配置环境 |
-| **任何平台** | Docker (推荐给非技术用户) | 零环境配置 |
+| **任何平台** | Docker | 零环境配置 |
 
 ### 前置环境要求
 
@@ -127,16 +150,8 @@ castflux/
 | HuggingFace Token | 需接受 pyannote 协议 | 下载说话人分离模型 |
 | LLM API Key | 有效 | 调用 AI 生成标题 (DeepSeek/Qwen/GLM 等) |
 
-### 方式一: 一键脚本 (推荐)
+### macOS / Linux 一键脚本
 
-**Windows (PowerShell)**:
-```powershell
-# 以管理员身份运行 PowerShell, 执行:
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-irm https://raw.githubusercontent.com/cybertronic23/castflux/main/scripts/setup.ps1 | iex
-```
-
-**macOS / Linux**:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cybertronic23/castflux/main/scripts/setup.sh | bash
 ```
@@ -170,9 +185,10 @@ ls output/
 ### 方式三: 手动安装
 
 ```bash
-# 1. 安装 ffmpeg
-brew install ffmpeg              # macOS (推荐 brew install ffmpeg-full)
-sudo apt install ffmpeg          # Ubuntu/Debian
+# 1. 安装 ffmpeg + Tcl/Tk（GUI 需要）
+brew install ffmpeg tcl-tk       # macOS (推荐 ffmpeg-full)
+brew install python-tk           # macOS (Tkinter 支持)
+sudo apt install ffmpeg python3-tk  # Ubuntu/Debian
 winget install Gyan.FFmpeg       # Windows (需管理员)
 
 # 2. 进入项目目录
@@ -209,7 +225,7 @@ export HF_TOKEN="hf_..."
 
 ### 基本用法
 
-提供两种运行方式:
+提供三种运行方式:
 
 ```bash
 # 方式一: 命令行工具 (推荐)
@@ -217,7 +233,17 @@ castflux input_video.mp4 -o slices
 
 # 方式二: 模块直接运行
 uv run python3 -m castflux input_video.mp4 -o slices
+
+# 方式三: 图形界面 (推荐 Windows 用户)
+uv run castflux-gui                           # macOS/Linux
+uv run python -m castflux.gui                 # 通用
 ```
+
+> **Windows 用户**:  
+> 1. 第一次使用，双击 **`scripts/setup_gui.bat`**（自动装好全部环境）  
+> 2. 以后每次双击桌面 "CastFlux" 快捷方式，或 **`scripts/run_gui.bat`** 启动
+>
+> macOS/Linux 需先安装 Tcl/Tk: `brew install tcl-tk python-tk`
 
 ### 完整参数
 
@@ -233,6 +259,8 @@ uv run python3 -m castflux input_video.mp4 -o slices
 | `--llm-workers` | `5` | LLM 并发数 |
 | `--keep-audio` | — | 保留临时音频文件 |
 | `--verbose` | — | DEBUG 级别日志 |
+
+> GUI 模式下无需记忆参数，界面可直接设置。`--model` 默认 `tiny` 适合快速测试。`--verbose` 在 GUI 日志窗口始终启用。
 
 ### LLM 提供商
 
