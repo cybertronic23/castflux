@@ -13,6 +13,7 @@
 - [安装部署](#安装部署)
 - [使用说明](#使用说明)
 - [输出说明](#输出说明)
+- [测试指南](#测试指南)
 - [注意事项与常见问题](#注意事项与常见问题)
 
 ---
@@ -49,7 +50,7 @@
   └─[7] 切片输出 (ffmpeg)
          ├─ 截取 QA 段时间范围
          ├─ setpts + atempo 实现 1.3x 倍速
-         ├─ drawtext 叠加前情提要 (前 5s)
+         ├─ drawtext 叠加前情提要 (前 5s) / Pillow PNG 降级
          └─ → part_01.mp4 ~ part_N.mp4
 ```
 
@@ -89,10 +90,17 @@ castflux/
 │   ├── setup.ps1             # Windows 一键安装脚本
 │   ├── setup.sh              # macOS/Linux 一键安装脚本
 │   └── castflux.bat          # Windows 快捷运行脚本
+├── test_data/                # 测试数据 (已 .gitignore)
+│   ├── test_guide.md         # 完整测试流程文档
+│   ├── scripts/              # 测试生成脚本
+│   ├── input_file/           # 输入测试视频
+│   └── output_slices/        # 测试输出结果
 ├── Dockerfile                # 容器化部署
 ├── docker-compose.yml        # Docker Compose 配置
 ├── pyproject.toml             # 项目配置 + CLI 入口
 ├── README.md
+├── .env.example              # 环境变量模板
+├── .gitignore
 ├── uv.lock
 └── .venv/
 ```
@@ -163,23 +171,20 @@ ls output/
 
 ```bash
 # 1. 安装 ffmpeg
-brew install ffmpeg              # macOS
+brew install ffmpeg              # macOS (推荐 brew install ffmpeg-full)
 sudo apt install ffmpeg          # Ubuntu/Debian
 winget install Gyan.FFmpeg       # Windows (需管理员)
 
 # 2. 进入项目目录
 cd castflux
 
-# 3. 用 UV 创建虚拟环境并安装依赖 (~5-15 min)
+# 3. 用 UV 创建虚拟环境并安装依赖
 uv sync
 
-# 4. 安装 CastFlux 到当前环境
-uv pip install -e .
+# 4. 验证安装 (uv sync 已自动注册 CLI)
+uv run castflux --help
 
-# 5. 验证安装
-castflux --help
-
-# 6. 设置环境变量 (选一个你有的)
+# 5. 设置环境变量
 export DEEPSEEK_API_KEY="sk-..."     # DeepSeek (默认)
 # export QWEN_API_KEY="sk-..."       # 阿里通义千问
 # export GLM_API_KEY="sk-..."        # 智谱 GLM
@@ -195,7 +200,8 @@ export HF_TOKEN="hf_..."
 2. 登录后接受模型协议:
    - https://huggingface.co/pyannote/speaker-diarization-3.1
    - https://huggingface.co/pyannote/segmentation-3.0
-3. `export HF_TOKEN="hf_xxxx"`
+   - https://huggingface.co/pyannote/speaker-diarization-community-1
+3. `export HF_TOKEN="hf_xxxx"`（或写入项目 `.env` 文件）
 
 ---
 
@@ -342,9 +348,11 @@ slices/
 | 错误 | 原因 | 解决 |
 |------|------|------|
 | `ffmpeg 未安装` | 系统缺 ffmpeg | `brew install ffmpeg` |
+| `No such filter: 'drawtext'` | ffmpeg 没编译 libfreetype | `brew install ffmpeg-full` 或自动降级 Pillow 叠加 |
 | `DEEPSEEK_API_KEY 未设置` | 缺 API key | 设置对应提供商的环境变量, 见 LLM 提供商表格 |
 | `HF_TOKEN 未设置` | 缺 HuggingFace token | 见配置说明 |
 | `说话人分离失败` | token 未授权 | 检查是否已接受模型协议 |
+| `'DiarizeOutput' object has no attribute 'itertracks'` | pyannote.audio 4.x API 变化 | 已兼容处理 |
 | `无 QA 对` | 无双人对话 / 声纹不准确 | 检查视频内容 |
 | `LLM 调用全部失败` | 网络 / key 问题 | 检查网络和 key |
 
