@@ -5,11 +5,10 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version tag (e.g. v1.0.0)"
-        required: false
-        default: "v1.0.0"
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build:
