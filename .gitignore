@@ -192,3 +192,7 @@ test_data/
 # 程序输出切片（仅保留 .gitkeep 占位）
 output_slices/*
 !output_slices/.gitkeep
+
+# 安装程序构建输出
+dist/
+*.exe

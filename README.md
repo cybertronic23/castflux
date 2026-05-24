@@ -6,8 +6,37 @@
 
 ---
 
+## Windows 用户：下载 EXE 一键安装
+
+> 不用装 Python、不用装 ffmpeg、不用敲任何命令。下载 → 双击 → 填入 API Key → 开用。
+
+**👇 下载 CastFlux 安装程序**
+<p align="left">
+  <a href="https://github.com/cybertronic23/castflux/releases/latest">
+    <img src="https://img.shields.io/github/v/release/cybertronic23/castflux?label=最新版本&color=blue">
+  </a>
+  <a href="https://github.com/cybertronic23/castflux/releases/latest/download/CastFlux_Setup_1.0.0.exe">
+    <img src="https://img.shields.io/badge/下载-Windows_安装程序-brightgreen?logo=windows">
+  </a>
+</p>
+
+```text
+① 下载 CastFlux_Setup_1.0.0.exe
+② 双击运行，一路"下一步"
+③ 安装程序自动下载 Python / ffmpeg / 全部依赖
+④ 安装完成自动打开界面
+⑤ 点右上角"设置"，填入 HF_TOKEN 和 DEEPSEEK_API_KEY
+⑥ 选择视频文件，开始切片！
+```
+
+> 需要 GitHub Token？→ [HuggingFace Token 配置](#huggingface-token-配置)  
+> 需要 API Key？→ [LLM 提供商](#llm-提供商)
+
+---
+
 ## 目录
 
+- [Windows 用户：下载 EXE 一键安装](#windows-用户下载-exe-一键安装)
 - [核心逻辑与架构](#核心逻辑与架构)
 - [工程目录解析](#工程目录解析)
 - [安装部署](#安装部署)
@@ -89,6 +118,8 @@ castflux/
 ├── scripts/
 │   ├── setup_gui.bat         # Windows 一键安装（自动装 Python/UV/ffmpeg）
 │   ├── run_gui.bat           # Windows 双击启动 GUI
+│   ├── installer.iss         # Inno Setup 安装程序脚本
+│   ├── build_installer.ps1   # 安装程序构建脚本（Windows）
 │   ├── setup.sh              # macOS/Linux 一键安装脚本
 │   └── castflux.bat          # Windows CLI 快捷运行脚本
 ├── test_data/                # 测试数据 (已 .gitignore)
@@ -96,6 +127,7 @@ castflux/
 │   ├── scripts/              # 测试生成脚本
 │   ├── input_file/           # 输入测试视频
 │   └── output_slices/        # 测试输出结果
+├── .github/workflows/        # GitHub Actions 构建工作流
 ├── Dockerfile                # 容器化部署
 ├── docker-compose.yml        # Docker Compose 配置
 ├── pyproject.toml             # 项目配置 + CLI 入口
@@ -112,7 +144,21 @@ castflux/
 
 ### Windows 用户: 傻瓜式一键安装（什么都不用管）
 
-> 只需双击一个文件，Python、ffmpeg、全部依赖自动装好，无需任何手动操作。
+> 无需任何命令行操作，双击即可。
+
+有两种方式，任选其一：
+
+**方式 A：下载 EXE 安装程序（推荐）**
+
+从 [Releases 页面](https://github.com/cybertronic23/castflux/releases/latest) 下载 `CastFlux_Setup_x.x.x.exe`，双击运行，一路"下一步"即可。
+
+```text
+下载 → 双击 → 下一步 → 完成 → 开用！
+```
+
+**方式 B：双击 setup_gui.bat（从源码安装）**
+
+适用于已通过 Git 克隆了本仓库的用户：
 
 ```text
 步骤 1:  双击 scripts/setup_gui.bat （只需运行一次）
@@ -126,7 +172,7 @@ castflux/
 步骤 2:  双击桌面 "CastFlux" 图标 （以后每次都双击这个）
 ```
 
-**没有任何安装步骤需要你手动操作**。如果提示防火墙/杀毒，选择"允许"即可。
+**两种方式都不需要你手动安装任何东西**。如果提示防火墙/杀毒，选择"允许"即可。
 
 > ⚠ 第一次启动后，点界面右上角"设置"按钮，填入 `HF_TOKEN` 和 `DEEPSEEK_API_KEY`。
 > 不知道怎么获取？详见 [HuggingFace Token 配置](#huggingface-token-配置) 和 [LLM 提供商](#llm-提供商)。
