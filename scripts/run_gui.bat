@@ -1,13 +1,19 @@
 @echo off
-chcp 65001 >nul
 title CastFlux
 cd /d "%~dp0.."
 
-echo 正在启动 CastFlux...
-uv run python -m castflux.gui
-
-if %errorlevel% neq 0 (
+if not exist ".venv\Scripts\python.exe" (
     echo.
-    echo ❌ 启动失败，请先运行 setup_gui.bat 完成安装。
+    echo   [ERROR] 未检测到虚拟环境
+    echo   请先双击 scripts\setup_gui.bat 完成安装
+    echo.
     pause
+    exit /b 1
 )
+
+echo 启动 CastFlux...
+".venv\Scripts\python.exe" -m castflux.gui
+
+echo.
+echo 程序已退出
+pause
