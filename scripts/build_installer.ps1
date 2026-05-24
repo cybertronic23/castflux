@@ -2,10 +2,6 @@
 # 在 Windows 上运行此脚本以编译安装程序 EXE
 # 用法: .\build_installer.ps1
 
-param(
-    [string]$OutputDir = (Join-Path $PSScriptRoot "..\dist")
-)
-
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -13,44 +9,55 @@ Write-Host "  CastFlux Installer Builder" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-$InnoDir = Join-Path $env:TEMP "inno-setup-portable"
-
-# 1. 下载 Inno Setup Portable（如果不存在）
-$InnoExe = Join-Path $InnoDir "ISCC.exe"
-if (-not (Test-Path $InnoExe)) {
-    Write-Host "[1/3] 下载 Inno Setup Portable..." -ForegroundColor Yellow
-    if (-not (Test-Path $InnoDir)) { New-Item -ItemType Directory -Path $InnoDir -Force | Out-Null }
-
-    $InnoUrl = "https://jrsoftware.org/download.php/innosetup-portable.zip"
-    $InnoZip = Join-Path $env:TEMP "innosetup-portable.zip"
-
+# 1. 确认 Inno Setup 已安装
+$InnoPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+if (-not (Test-Path $InnoPath)) {
+    $InnoPath = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+}
+if (-not (Test-Path $InnoPath)) {
+    Write-Host "[1/3] 安装 Inno Setup..." -ForegroundColor Yellow
     try {
-        Invoke-WebRequest -Uri $InnoUrl -OutFile $InnoZip -UseBasicParsing
-        Expand-Archive -Path $InnoZip -DestinationPath $InnoDir -Force
-        Write-Host "  Inno Setup 已解压到: $InnoDir" -ForegroundColor Green
+        choco install innosetup -y --no-progress
+        $InnoPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
     } catch {
-        Write-Host "  [ERROR] 下载失败: $_" -ForegroundColor Red
-        Write-Host "  请手动下载: https://jrsoftware.org/download.php/innosetup-portable.zip"
-        Write-Host "  解压到: $InnoDir"
-        exit 1
+        Write-Host "  [ERROR] Chocolatey 安装失败，尝试便携版..." -ForegroundColor Red
     }
-} else {
-    Write-Host "[1/3] Inno Setup 已就绪" -ForegroundColor Green
 }
 
-# 2. 确保 dist 目录存在
+# 2. 如果 Chocolatey 不可用，使用便携版
+if (-not (Test-Path $InnoPath)) {
+    $InnoDir = Join-Path $env:TEMP "inno-setup-portable"
+    $InnoPath = Join-Path $InnoDir "ISCC.exe"
+    if (-not (Test-Path $InnoPath)) {
+        Write-Host "  下载 Inno Setup Portable..." -ForegroundColor Yellow
+        $InnoUrl = "https://jrsoftware.org/download.php/innosetup-portable.zip"
+        $InnoZip = Join-Path $env:TEMP "innosetup-portable.zip"
+        try {
+            Invoke-WebRequest -Uri $InnoUrl -OutFile $InnoZip -UseBasicParsing
+            Expand-Archive -Path $InnoZip -DestinationPath $InnoDir -Force
+            Write-Host "  Inno Setup 已解压" -ForegroundColor Green
+        } catch {
+            Write-Host "  [ERROR] 下载/解压失败: $_" -ForegroundColor Red
+            exit 1
+        }
+    }
+}
+
+# 3. 创建输出目录
+$OutputDir = Join-Path $PSScriptRoot "..\dist"
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
-Write-Host "[2/3] 输出目录: $OutputDir" -ForegroundColor Yellow
+Write-Host "[1/3] 输出目录: $OutputDir" -ForegroundColor Yellow
 
-# 3. 编译安装程序
+# 4. 编译安装程序
 $IssPath = Join-Path $PSScriptRoot "installer.iss"
-Write-Host "[3/3] 编译安装程序..." -ForegroundColor Yellow
-Write-Host "  ISS: $IssPath" -ForegroundColor Gray
+Write-Host "[2/3] 编译安装程序..." -ForegroundColor Yellow
+Write-Host "  ISCC: $InnoPath" -ForegroundColor Gray
+Write-Host "  ISS:  $IssPath" -ForegroundColor Gray
 
 try {
-    & $InnoExe $IssPath
+    & $InnoPath $IssPath
     if ($LASTEXITCODE -ne 0) {
         throw "ISCC 编译失败 (exit code: $LASTEXITCODE)"
     }
@@ -60,14 +67,14 @@ try {
     exit 1
 }
 
-# 列出生成的 EXE
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  生成的文件:" -ForegroundColor Cyan
+# 5. 列出生成的 EXE
+Write-Host "[3/3] 生成文件：" -ForegroundColor Yellow
 Get-ChildItem $OutputDir -Filter "CastFlux_Setup*.exe" | ForEach-Object {
     $size = "{0:N1} MB" -f ($_.Length / 1MB)
     Write-Host "  $($_.Name)  ($size)" -ForegroundColor White
 }
-Write-Host "========================================" -ForegroundColor Cyan
 
-pause
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  完成！" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
