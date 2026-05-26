@@ -78,37 +78,24 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 2. 确认 Inno Setup 已安装
-$InnoPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-if (-not (Test-Path $InnoPath)) {
-    $InnoPath = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
-}
-if (-not (Test-Path $InnoPath)) {
-    Write-Host "[2/4] 安装 Inno Setup..." -ForegroundColor Yellow
-    try {
-        choco install innosetup -y --no-progress
-        $InnoPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-    } catch {
-        Write-Host "  [ERROR] Chocolatey 安装失败，尝试便携版..." -ForegroundColor Red
+Write-Host "[2/4] 检查 Inno Setup..." -ForegroundColor Yellow
+$InnoCandidates = @(
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+)
+$InnoPath = $null
+foreach ($Candidate in $InnoCandidates) {
+    if (Test-Path $Candidate) {
+        $InnoPath = $Candidate
+        break
     }
 }
-
-# 3. 如果 Chocolatey 不可用，使用便携版
-if (-not (Test-Path $InnoPath)) {
-    $InnoDir = Join-Path $env:TEMP "inno-setup-portable"
-    $InnoPath = Join-Path $InnoDir "ISCC.exe"
-    if (-not (Test-Path $InnoPath)) {
-        Write-Host "  下载 Inno Setup Portable..." -ForegroundColor Yellow
-        $InnoUrl = "https://jrsoftware.org/download.php/innosetup-portable.zip"
-        $InnoZip = Join-Path $env:TEMP "innosetup-portable.zip"
-        try {
-            Invoke-WebRequest -Uri $InnoUrl -OutFile $InnoZip -UseBasicParsing
-            Expand-Archive -Path $InnoZip -DestinationPath $InnoDir -Force
-            Write-Host "  Inno Setup 已解压" -ForegroundColor Green
-        } catch {
-            Write-Host "  [ERROR] 下载/解压失败: $_" -ForegroundColor Red
-            exit 1
-        }
-    }
+if (-not $InnoPath) {
+    Write-Host ""
+    Write-Host "  [ERROR] 未找到 Inno Setup 6。" -ForegroundColor Red
+    Write-Host "  请先安装 Inno Setup 6，然后重新运行本脚本：" -ForegroundColor Yellow
+    Write-Host "  https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
+    exit 1
 }
 
 # 4. 创建输出目录
