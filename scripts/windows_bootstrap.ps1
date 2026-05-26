@@ -46,6 +46,52 @@ function Assert-CommandSucceeded([string]$What, [int]$Code) {
     }
 }
 
+function Get-PipIndexes {
+    $Indexes = @()
+    if ($env:PIP_INDEX_URL) {
+        $Indexes += $env:PIP_INDEX_URL
+    }
+    $Indexes += @(
+        "https://pypi.org/simple",
+        "https://pypi.tuna.tsinghua.edu.cn/simple",
+        "https://mirrors.aliyun.com/pypi/simple"
+    )
+    $Indexes | Select-Object -Unique
+}
+
+function Invoke-PipInstall {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    $BaseArgs = @(
+        "-m", "pip", "install",
+        "--prefer-binary",
+        "--retries", "10",
+        "--timeout", "120",
+        "--no-input",
+        "--disable-pip-version-check"
+    )
+
+    foreach ($IndexUrl in Get-PipIndexes) {
+        for ($Attempt = 1; $Attempt -le 3; $Attempt++) {
+            Write-Host "  $Description (index: $IndexUrl, attempt $Attempt/3)" -ForegroundColor Gray
+            & $VenvPython @BaseArgs --index-url $IndexUrl @Arguments
+            if ($LASTEXITCODE -eq 0) {
+                return
+            }
+            Write-Host "  pip failed with exit code $LASTEXITCODE, retrying..." -ForegroundColor Yellow
+            Start-Sleep -Seconds (5 * $Attempt)
+        }
+    }
+
+    throw "$Description failed after trying all package indexes"
+}
+
 try {
     Write-Host "============================================" -ForegroundColor Cyan
     Write-Host "  CastFlux one-click Windows setup" -ForegroundColor Cyan
@@ -84,12 +130,10 @@ try {
         & $PythonExe -m venv $VenvDir
         Assert-CommandSucceeded "venv creation" $LASTEXITCODE
     }
-    & $VenvPython -m pip install --upgrade pip setuptools wheel --prefer-binary
-    Assert-CommandSucceeded "pip bootstrap" $LASTEXITCODE
+    Invoke-PipInstall -Description "pip bootstrap" -Arguments @("--upgrade", "pip", "setuptools", "wheel")
 
     Write-Step "[3/5] Installing CastFlux Python dependencies"
-    & $VenvPython -m pip install -e $AppRoot --prefer-binary
-    Assert-CommandSucceeded "CastFlux dependency installation" $LASTEXITCODE
+    Invoke-PipInstall -Description "CastFlux dependency installation" -Arguments @("-e", $AppRoot)
 
     Write-Step "[4/5] Preparing local ffmpeg"
     if (-not (Test-Path $FfmpegExe)) {
