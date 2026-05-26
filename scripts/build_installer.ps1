@@ -1,6 +1,5 @@
-# CastFlux Installer Builder
-# 在 Windows 上运行此脚本以编译安装程序 EXE
-# 用法: .\build_installer.ps1
+# CastFlux Windows installer builder
+# Usage: powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1
 
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -37,8 +36,7 @@ Write-Host "  CastFlux Installer Builder" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. 准备离线安装载荷：Python 安装器、ffmpeg、Python wheels
-Write-Host "[1/4] 准备离线安装载荷..." -ForegroundColor Yellow
+Write-Host "[1/4] Preparing offline payload..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Path $VendorDownloads, $WheelhouseDir -Force | Out-Null
 
 $PythonInstaller = Join-Path $VendorDownloads "python-$PythonVersion-amd64.exe"
@@ -77,8 +75,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "pip download failed (exit code: $LASTEXITCODE)"
 }
 
-# 2. 确认 Inno Setup 已安装
-Write-Host "[2/4] 检查 Inno Setup..." -ForegroundColor Yellow
+Write-Host "[2/4] Checking Inno Setup..." -ForegroundColor Yellow
 $InnoCandidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
     "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
@@ -92,38 +89,30 @@ foreach ($Candidate in $InnoCandidates) {
 }
 if (-not $InnoPath) {
     Write-Host ""
-    Write-Host "  [ERROR] 未找到 Inno Setup 6。" -ForegroundColor Red
-    Write-Host "  请先安装 Inno Setup 6，然后重新运行本脚本：" -ForegroundColor Yellow
+    Write-Host "  [ERROR] Inno Setup 6 was not found." -ForegroundColor Red
+    Write-Host "  Install Inno Setup 6, then run this script again:" -ForegroundColor Yellow
     Write-Host "  https://jrsoftware.org/isdl.php" -ForegroundColor Yellow
     exit 1
 }
 
-# 4. 创建输出目录
 $OutputDir = Join-Path $RepoRoot "dist"
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
-Write-Host "[3/4] 输出目录: $OutputDir" -ForegroundColor Yellow
+Write-Host "[3/4] Output directory: $OutputDir" -ForegroundColor Yellow
 
-# 5. 编译安装程序
 $IssPath = Join-Path $PSScriptRoot "installer.iss"
-Write-Host "[4/4] 编译安装程序..." -ForegroundColor Yellow
+Write-Host "[4/4] Compiling installer..." -ForegroundColor Yellow
 Write-Host "  ISCC: $InnoPath" -ForegroundColor Gray
 Write-Host "  ISS:  $IssPath" -ForegroundColor Gray
 
-try {
-    & $InnoPath $IssPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "ISCC 编译失败 (exit code: $LASTEXITCODE)"
-    }
-    Write-Host "  编译成功！" -ForegroundColor Green
-} catch {
-    Write-Host "  [ERROR] 编译失败: $_" -ForegroundColor Red
-    exit 1
+& $InnoPath $IssPath
+if ($LASTEXITCODE -ne 0) {
+    throw "ISCC failed (exit code: $LASTEXITCODE)"
 }
 
-# 6. 列出生成的 EXE
-Write-Host "生成文件：" -ForegroundColor Yellow
+Write-Host "  Compile succeeded." -ForegroundColor Green
+Write-Host "Generated files:" -ForegroundColor Yellow
 Get-ChildItem $OutputDir -Filter "CastFlux_Setup*.exe" | ForEach-Object {
     $size = "{0:N1} MB" -f ($_.Length / 1MB)
     Write-Host "  $($_.Name)  ($size)" -ForegroundColor White
@@ -131,5 +120,5 @@ Get-ChildItem $OutputDir -Filter "CastFlux_Setup*.exe" | ForEach-Object {
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  完成！" -ForegroundColor Cyan
+Write-Host "  Done" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
