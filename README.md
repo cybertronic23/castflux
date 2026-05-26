@@ -23,7 +23,7 @@
 ```text
 ① 下载 CastFlux_Setup_1.0.0.exe
 ② 双击运行，一路"下一步"
-③ 安装程序自动下载 Python / ffmpeg / 全部依赖
+③ 安装程序自动下载私有 Python / ffmpeg / 全部依赖
 ④ 安装完成自动打开界面
 ⑤ 点右上角"设置"，填入 HF_TOKEN 和 DEEPSEEK_API_KEY
 ⑥ 选择视频文件，开始切片！
@@ -116,7 +116,8 @@ castflux/
 ├── src/castflux/             # 核心包 (9 个模块)
 ├── tests/                    # 单元测试
 ├── scripts/
-│   ├── setup_gui.bat         # Windows 一键安装（自动装 Python/UV/ffmpeg）
+│   ├── setup_gui.bat         # Windows 一键安装入口
+│   ├── windows_bootstrap.ps1 # Windows 私有 Python/ffmpeg/依赖自举脚本
 │   ├── run_gui.bat           # Windows 双击启动 GUI
 │   ├── installer.iss         # Inno Setup 安装程序脚本
 │   ├── build_installer.ps1   # 安装程序构建脚本（Windows）
@@ -163,16 +164,15 @@ castflux/
 ```text
 步骤 1:  双击 scripts/setup_gui.bat （只需运行一次）
           ↓
-     自动检测/安装 Python 3.13
-     自动安装 UV 包管理器
-     自动下载 ffmpeg 并解压
-     自动安装 CastFlux 所有依赖
+     自动安装私有 Python 3.11 到程序目录
+     自动创建 .venv 并安装 CastFlux 所有依赖
+     自动下载 ffmpeg 到程序目录
      自动在桌面创建 CastFlux 快捷方式
           ↓
 步骤 2:  双击桌面 "CastFlux" 图标 （以后每次都双击这个）
 ```
 
-**两种方式都不需要你手动安装任何东西**。如果提示防火墙/杀毒，选择"允许"即可。
+**两种方式都不需要你手动安装任何东西**，也不会污染系统 PATH。安装日志会保存在 `runtime/logs/`，如果客户电脑网络不好，可以把这个日志发给开发者排查。
 
 > ⚠ 第一次启动后，点界面右上角"设置"按钮，填入 `HF_TOKEN` 和 `DEEPSEEK_API_KEY`。
 > 不知道怎么获取？详见 [HuggingFace Token 配置](#huggingface-token-配置) 和 [LLM 提供商](#llm-提供商)。
@@ -190,8 +190,8 @@ castflux/
 
 | 组件 | 版本要求 | 用途 |
 |------|---------|------|
-| Python | >= 3.10 | 运行环境 |
-| UV | >= 0.4.0 | 依赖管理 |
+| Python | >= 3.10 | 运行环境；Windows 安装包会自动安装私有 Python 3.11 |
+| UV | >= 0.4.0 | 开发/手动安装依赖管理；Windows 安装包不要求用户安装 |
 | ffmpeg | >= 4.x | 音视频处理 |
 | HuggingFace Token | 需接受 pyannote 协议 | 下载说话人分离模型 |
 | LLM API Key | 有效 | 调用 AI 生成标题 (DeepSeek/Qwen/GLM 等) |
@@ -286,8 +286,9 @@ uv run python -m castflux.gui                 # 通用
 ```
 
 > **Windows 用户**:  
-> 1. 第一次使用，双击 **`scripts/setup_gui.bat`**（自动装好全部环境）  
-> 2. 以后每次双击桌面 "CastFlux" 快捷方式，或 **`scripts/run_gui.bat`** 启动
+> 1. 推荐下载 Release 里的 `CastFlux_Setup_*.exe`，双击安装。
+> 2. 安装包会把程序放到当前用户目录，自动准备 Python、ffmpeg 和依赖。
+> 3. 以后每次双击桌面 "CastFlux" 快捷方式启动。
 >
 > macOS/Linux 需先安装 Tcl/Tk: `brew install tcl-tk python-tk`
 
@@ -457,4 +458,3 @@ rm -rf ~/.cache/whisper/ ~/.cache/huggingface/hub/
 ## 开源许可
 
 [MIT License](LICENSE) © 2026 cybertronic23
-

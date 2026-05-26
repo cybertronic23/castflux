@@ -57,6 +57,16 @@ PROVIDER_CONFIG = {
 DEFAULT_PROVIDER = "deepseek"
 
 
+def _is_configured_secret(value: str | None) -> bool:
+    if not value:
+        return False
+    value = value.strip()
+    if not value:
+        return False
+    placeholders = ("你的", "your_", "your-", "sk-...", "hf_...")
+    return not any(marker in value.lower() for marker in placeholders)
+
+
 def resolve_llm_config(provider: str | None = None, model: str | None = None) -> dict:
     provider = provider or os.environ.get("LLM_PROVIDER") or DEFAULT_PROVIDER
     provider = provider.lower()
@@ -68,7 +78,7 @@ def resolve_llm_config(provider: str | None = None, model: str | None = None) ->
         cfg = PROVIDER_CONFIG[DEFAULT_PROVIDER]
 
     api_key = os.environ.get(cfg["api_key_env"]) or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
+    if not _is_configured_secret(api_key):
         logger.error(
             f"缺少 API key: 请设置 {cfg['api_key_env']} 环境变量\n"
             f"  你也可以设置 OPENAI_API_KEY 作为通用回退"

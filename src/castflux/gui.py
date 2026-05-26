@@ -32,6 +32,16 @@ def _load_env(env_path: str = ".env") -> dict:
     return extra
 
 
+def _configured_secret(value: str | None) -> bool:
+    if not value:
+        return False
+    value = value.strip()
+    if not value:
+        return False
+    placeholders = ("你的", "your_", "your-", "sk-...", "hf_...")
+    return not any(marker in value.lower() for marker in placeholders)
+
+
 STEPS = [
     (r"步骤1/6", "提取音频"),
     (r"步骤2/6", "语音转文字"),
@@ -253,6 +263,7 @@ class CastFluxGUI:
              "如用其他 LLM 可以不填"),
             ("QWEN_API_KEY", "通义千问 Qwen Key（可选）", ""),
             ("GLM_API_KEY", "智谱 GLM Key（可选）", ""),
+            ("MINIMAX_API_KEY", "MiniMax Key（可选）", ""),
             ("OPENAI_API_KEY", "OpenAI Key（可选）", ""),
         ]
         vars_ = {}
@@ -336,10 +347,26 @@ class CastFluxGUI:
             return
 
         env = self._build_env()
-        if not env.get("HF_TOKEN"):
+        if not _configured_secret(env.get("HF_TOKEN")):
             ret = messagebox.askyesno(
                 "缺少 HF_TOKEN",
                 "未设置 HuggingFace Token，说话人分离将无法工作。\n"
+                "是否现在设置 API Key？",
+            )
+            if ret:
+                self._settings_dialog()
+            return
+
+        if not (
+            _configured_secret(env.get("DEEPSEEK_API_KEY"))
+            or _configured_secret(env.get("QWEN_API_KEY"))
+            or _configured_secret(env.get("GLM_API_KEY"))
+            or _configured_secret(env.get("MINIMAX_API_KEY"))
+            or _configured_secret(env.get("OPENAI_API_KEY"))
+        ):
+            ret = messagebox.askyesno(
+                "缺少 API Key",
+                "未设置 DeepSeek/Qwen/GLM/MiniMax/OpenAI API Key，无法生成标题和前情提要。\n"
                 "是否现在设置 API Key？",
             )
             if ret:

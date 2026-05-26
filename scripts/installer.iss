@@ -14,15 +14,15 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\CastFlux
+DefaultDirName={localappdata}\Programs\CastFlux
 DefaultGroupName=CastFlux
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=CastFlux_Setup
+OutputBaseFilename=CastFlux_Setup_{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableWelcomePage=no
 
@@ -36,22 +36,28 @@ Source: "..\pyproject.toml"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\uv.lock"; DestDir: "{app}"; Flags: ignoreversion
-; .env 模板（不含真实密钥）
-Source: "..\.env.example"; DestDir: "{app}"; DestName: ".env"; Flags: ignoreversion onlyifdoesntexist
+; Environment template only. setup creates an empty .env so placeholder keys are never used.
+Source: "..\.env.example"; DestDir: "{app}"; Flags: ignoreversion
 ; 脚本
 Source: "run_gui.bat"; DestDir: "{app}\scripts"; Flags: ignoreversion
 Source: "setup_gui.bat"; DestDir: "{app}\scripts"; Flags: ignoreversion
+Source: "windows_bootstrap.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 Source: "castflux.bat"; DestDir: "{app}\scripts"; Flags: ignoreversion
 ; 输出目录占位
 Source: "..\output_slices\.gitkeep"; DestDir: "{app}\output_slices"; Flags: ignoreversion
 
 [Icons]
-Name: "{commondesktop}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"; Comment: "CastFlux"
+Name: "{userdesktop}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"; Comment: "CastFlux"
 Name: "{group}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"
 Name: "{group}\Uninstall CastFlux"; Filename: "{uninstallexe}"
 
 [Run]
-; 安装 Python、UV、ffmpeg、项目依赖（窗口可见，让用户看到进度）
-Filename: "{app}\scripts\setup_gui.bat"; Parameters: "--installer"; StatusMsg: "正在配置环境（自动安装 Python / UV / ffmpeg，需几分钟）..."; Flags: waituntilterminated shellexec
+; 安装私有 Python、ffmpeg、项目依赖（窗口可见，让用户看到进度）
+Filename: "{app}\scripts\setup_gui.bat"; Parameters: "--installer"; StatusMsg: "正在配置环境（自动安装 Python / ffmpeg / 依赖，需几分钟）..."; Flags: waituntilterminated shellexec
 ; 安装完成，可选启动 GUI
 Filename: "{app}\scripts\run_gui.bat"; Description: "启动 CastFlux"; Flags: postinstall nowait skipifsilent shellexec unchecked
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\.venv"
+Type: filesandordirs; Name: "{app}\runtime"
+Type: filesandordirs; Name: "{app}\scripts\ffmpeg"

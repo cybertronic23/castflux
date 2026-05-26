@@ -13,11 +13,16 @@ if "%~1"=="" (
 )
 
 if not exist ".venv\Scripts\python.exe" (
-    echo [ERROR] 未检测到虚拟环境，请先运行 setup_gui.bat
-    pause
-    exit /b 1
+    echo 首次运行，正在配置 CastFlux 环境...
+    call "%~dp0setup_gui.bat"
+    if errorlevel 1 (
+        echo [ERROR] 环境配置失败
+        pause
+        exit /b 1
+    )
 )
 
+set "PATH=%~dp0ffmpeg\bin;%PATH%"
 echo 运行 CastFlux...
 ".venv\Scripts\python.exe" -m castflux "%~1" -o output --verbose
 pause

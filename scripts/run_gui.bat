@@ -1,26 +1,29 @@
 @echo off
+setlocal
 title CastFlux
 cd /d "%~dp0.."
 
 if not exist ".venv\Scripts\python.exe" (
     echo ============================================
-    echo   首次运行，正在配置环境...
+    echo   First run: preparing CastFlux environment
     echo ============================================
     echo.
-    call scripts\setup_gui.bat
+    call "%~dp0setup_gui.bat"
     if errorlevel 1 (
         echo.
-        echo   [ERROR] 环境配置失败
+        echo [ERROR] Environment setup failed.
         pause
         exit /b 1
     )
     cd /d "%~dp0.."
 )
 
-echo 启动 CastFlux...
+set "PATH=%~dp0ffmpeg\bin;%PATH%"
+echo Starting CastFlux...
 ".venv\Scripts\python.exe" -m castflux.gui
 if errorlevel 1 (
     echo.
-    echo   [ERROR] 启动失败
+    echo [ERROR] CastFlux failed to start.
+    echo Please run scripts\setup_gui.bat again or check runtime\logs.
     pause
 )

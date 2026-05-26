@@ -12,6 +12,16 @@ from castflux.llm import PROVIDER_CONFIG, DEFAULT_PROVIDER
 logger = logging.getLogger("castflux")
 
 
+def is_configured_secret(value: str | None) -> bool:
+    if not value:
+        return False
+    value = value.strip()
+    if not value:
+        return False
+    placeholders = ("你的", "your_", "your-", "sk-...", "hf_...")
+    return not any(marker in value.lower() for marker in placeholders)
+
+
 def setup_logging(verbose: bool = False):
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
@@ -33,7 +43,7 @@ def check_prerequisites(provider: str | None = None):
 
     if cfg:
         api_key = os.environ.get(cfg["api_key_env"]) or os.environ.get("OPENAI_API_KEY")
-        if not api_key:
+        if not is_configured_secret(api_key):
             logger.error(
                 f"请设置环境变量 %s (或回退 %s)",
                 cfg["api_key_env"],
@@ -41,11 +51,11 @@ def check_prerequisites(provider: str | None = None):
             )
             sys.exit(1)
     else:
-        if not os.environ.get("OPENAI_API_KEY"):
+        if not is_configured_secret(os.environ.get("OPENAI_API_KEY")):
             logger.error("请设置 OPENAI_API_KEY 环境变量")
             sys.exit(1)
 
-    if not os.environ.get("HF_TOKEN"):
+    if not is_configured_secret(os.environ.get("HF_TOKEN")):
         logger.error(
             "请设置 HF_TOKEN 环境变量\n"
             "  1. 在 https://huggingface.co/settings/tokens 创建 token\n"
