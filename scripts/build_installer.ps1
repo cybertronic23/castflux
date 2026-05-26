@@ -43,16 +43,12 @@ New-Item -ItemType Directory -Path $VendorDownloads, $WheelhouseDir -Force | Out
 
 $PythonInstaller = Join-Path $VendorDownloads "python-$PythonVersion-amd64.exe"
 if (-not (Test-Path $PythonInstaller)) {
-    Invoke-DownloadWithRetry `
-        -Url "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe" `
-        -OutFile $PythonInstaller
+    Invoke-DownloadWithRetry -Url "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe" -OutFile $PythonInstaller
 }
 
 $FfmpegZip = Join-Path $VendorDownloads "ffmpeg-release-essentials.zip"
 if (-not (Test-Path $FfmpegZip)) {
-    Invoke-DownloadWithRetry `
-        -Url "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" `
-        -OutFile $FfmpegZip
+    Invoke-DownloadWithRetry -Url "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile $FfmpegZip
 }
 
 $Deps = @(
@@ -68,13 +64,15 @@ $Deps = @(
 )
 
 Write-Host "  Downloading Python wheels into $WheelhouseDir" -ForegroundColor Gray
-python -m pip download `
-    --dest $WheelhouseDir `
-    --prefer-binary `
-    --only-binary=:all: `
-    --retries 10 `
-    --timeout 120 `
-    $Deps
+$PipDownloadArgs = @(
+    "-m", "pip", "download",
+    "--dest", $WheelhouseDir,
+    "--prefer-binary",
+    "--only-binary=:all:",
+    "--retries", "10",
+    "--timeout", "120"
+) + $Deps
+& python @PipDownloadArgs
 if ($LASTEXITCODE -ne 0) {
     throw "pip download failed (exit code: $LASTEXITCODE)"
 }
