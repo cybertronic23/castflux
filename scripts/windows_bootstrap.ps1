@@ -16,6 +16,7 @@ $AppRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $RuntimeDir = Join-Path $AppRoot "runtime"
 $DownloadDir = Join-Path $RuntimeDir "downloads"
 $LogDir = Join-Path $RuntimeDir "logs"
+$WheelhouseDir = Join-Path $RuntimeDir "wheelhouse"
 $PythonVersion = "3.11.9"
 $PythonDir = Join-Path $RuntimeDir "python311"
 $PythonExe = Join-Path $PythonDir "python.exe"
@@ -76,6 +77,20 @@ function Invoke-PipInstall {
         "--no-input",
         "--disable-pip-version-check"
     )
+
+    $OfflineWheels = @()
+    if (Test-Path $WheelhouseDir) {
+        $OfflineWheels = Get-ChildItem $WheelhouseDir -Filter "*.whl" -ErrorAction SilentlyContinue
+    }
+
+    if ($OfflineWheels.Count -gt 0) {
+        Write-Host "  $Description (offline wheelhouse: $WheelhouseDir)" -ForegroundColor Gray
+        & $VenvPython @BaseArgs --no-index --find-links $WheelhouseDir @Arguments
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+        Write-Host "  Offline wheelhouse install failed with exit code $LASTEXITCODE; falling back to online indexes." -ForegroundColor Yellow
+    }
 
     foreach ($IndexUrl in Get-PipIndexes) {
         for ($Attempt = 1; $Attempt -le 3; $Attempt++) {

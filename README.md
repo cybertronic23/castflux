@@ -23,7 +23,7 @@
 ```text
 ① 下载 CastFlux_Setup_1.0.0.exe
 ② 双击运行，一路"下一步"
-③ 安装程序自动下载私有 Python / ffmpeg / 全部依赖
+③ 安装程序内置私有 Python / ffmpeg / 全部依赖，自动配置
 ④ 安装完成自动打开界面
 ⑤ 点右上角"设置"，填入 HF_TOKEN 和 DEEPSEEK_API_KEY
 ⑥ 选择视频文件，开始切片！
@@ -172,7 +172,7 @@ castflux/
 步骤 2:  双击桌面 "CastFlux" 图标 （以后每次都双击这个）
 ```
 
-**两种方式都不需要你手动安装任何东西**，也不会污染系统 PATH。安装日志会保存在 `runtime/logs/`，如果客户电脑网络不好，可以把这个日志发给开发者排查。
+**两种方式都不需要你手动安装任何东西**，也不会污染系统 PATH。Release 安装包会尽量内置 Python、ffmpeg 和 Python wheels，客户电脑安装时优先离线完成；只有从源码直接双击 `setup_gui.bat` 且本地没有这些离线文件时，才会联网下载。安装日志会保存在 `runtime/logs/`，如果客户电脑网络不好，可以把这个日志发给开发者排查。
 
 > ⚠ 第一次启动后，点界面右上角"设置"按钮，填入 `HF_TOKEN` 和 `DEEPSEEK_API_KEY`。
 > 不知道怎么获取？详见 [HuggingFace Token 配置](#huggingface-token-配置) 和 [LLM 提供商](#llm-提供商)。

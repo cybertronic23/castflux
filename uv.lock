@@ -274,6 +274,7 @@ source = { editable = "." }
 dependencies = [
     { name = "faster-whisper" },
     { name = "openai" },
+    { name = "pillow" },
     { name = "pyannote-audio" },
     { name = "torch" },
     { name = "tqdm" },
@@ -283,6 +284,7 @@ dependencies = [
 requires-dist = [
     { name = "faster-whisper", specifier = ">=1.0.0" },
     { name = "openai", specifier = ">=1.0.0" },
+    { name = "pillow", specifier = ">=10.0.0" },
     { name = "pyannote-audio", specifier = ">=3.1.0" },
     { name = "torch", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.0.0" },
