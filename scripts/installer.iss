@@ -51,7 +51,7 @@ Name: "{group}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{a
 Name: "{group}\Uninstall CastFlux"; Filename: "{uninstallexe}"
 
 [Run]
-; 运行 setup_gui.bat 安装 Python、UV、ffmpeg、项目依赖
-Filename: "{app}\scripts\setup_gui.bat"; StatusMsg: "Installing Python / UV / ffmpeg..."; Flags: runhidden waituntilterminated
+; 安装 Python、UV、ffmpeg、项目依赖（窗口可见，让用户看到进度）
+Filename: "{app}\scripts\setup_gui.bat"; Parameters: "--installer"; StatusMsg: "正在配置环境（自动安装 Python / UV / ffmpeg，需几分钟）..."; Flags: waituntilterminated shellexec
 ; 安装完成，可选启动 GUI
-Filename: "{app}\scripts\run_gui.bat"; Description: "Launch CastFlux"; Flags: postinstall nowait skipifsilent shellexec unchecked
+Filename: "{app}\scripts\run_gui.bat"; Description: "启动 CastFlux"; Flags: postinstall nowait skipifsilent shellexec unchecked

@@ -3,17 +3,24 @@ title CastFlux
 cd /d "%~dp0.."
 
 if not exist ".venv\Scripts\python.exe" (
+    echo ============================================
+    echo   首次运行，正在配置环境...
+    echo ============================================
     echo.
-    echo   [ERROR] 未检测到虚拟环境
-    echo   请先双击 scripts\setup_gui.bat 完成安装
-    echo.
-    pause
-    exit /b 1
+    call scripts\setup_gui.bat
+    if errorlevel 1 (
+        echo.
+        echo   [ERROR] 环境配置失败
+        pause
+        exit /b 1
+    )
+    cd /d "%~dp0.."
 )
 
 echo 启动 CastFlux...
 ".venv\Scripts\python.exe" -m castflux.gui
-
-echo.
-echo 程序已退出
-pause
+if errorlevel 1 (
+    echo.
+    echo   [ERROR] 启动失败
+    pause
+)

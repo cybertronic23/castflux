@@ -135,4 +135,4 @@ echo.
 echo   双击桌面 "CastFlux" 图标启动
 echo   或运行 scripts\run_gui.bat
 echo ============================================
-pause
+if not "%1"=="--installer" pause
