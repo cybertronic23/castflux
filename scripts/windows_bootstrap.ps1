@@ -162,28 +162,30 @@ try {
 
     Write-Step "[4/5] Preparing local ffmpeg"
     if (-not (Test-Path $FfmpegExe)) {
-        $FfmpegZip = Join-Path $DownloadDir "ffmpeg-release-essentials.zip"
-        if (-not (Test-Path $FfmpegZip)) {
-            # Try multiple mirrors (China-friendly first)
-            $FfmpegUrls = @(
-                "https://mirrors.aliyun.com/ffmpeg/releases/ffmpeg-release-essentials.zip",
-                "https://mirrors.tuna.tsinghua.edu.cn/ffmpeg/releases/ffmpeg-release-essentials.zip",
-                "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-            )
-            $Downloaded = $false
-            foreach ($Url in $FfmpegUrls) {
-                try {
-                    Write-Host "  Trying: $Url" -ForegroundColor Gray
-                    Invoke-Download $Url $FfmpegZip
-                    $Downloaded = $true
-                    break
-                } catch {
-                    Write-Host "  Failed, trying next mirror..." -ForegroundColor Yellow
-                }
+        # Check multiple locations for ffmpeg zip
+        $FfmpegZip = $null
+        $Locations = @(
+            (Join-Path $PSScriptRoot "ffmpeg.zip"),
+            (Join-Path $AppRoot "ffmpeg.zip"),
+            (Join-Path $DownloadDir "ffmpeg-release-essentials.zip")
+        )
+        foreach ($Loc in $Locations) {
+            if (Test-Path $Loc) {
+                $FfmpegZip = $Loc
+                Write-Host "  Found ffmpeg at: $Loc" -ForegroundColor Gray
+                break
             }
-            if (-not $Downloaded) {
-                throw "Failed to download ffmpeg from all mirrors"
-            }
+        }
+        
+        if (-not $FfmpegZip) {
+            Write-Host ""
+            Write-Host "  ffmpeg not found. Please:" -ForegroundColor Yellow
+            Write-Host "  1. Download ffmpeg from https://www.gyan.dev/ffmpeg/builds/" -ForegroundColor Yellow
+            Write-Host "  2. Rename zip to ffmpeg.zip" -ForegroundColor Yellow
+            Write-Host "  3. Put it in: $DownloadDir" -ForegroundColor Yellow
+            Write-Host "  4. Run this script again" -ForegroundColor Yellow
+            Write-Host ""
+            throw "ffmpeg.zip not found in any of: $($Locations -join ', ')"
         }
 
         if (Test-Path $FfmpegRoot) {
