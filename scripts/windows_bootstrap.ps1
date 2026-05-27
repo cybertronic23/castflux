@@ -37,8 +37,18 @@ function Write-Step([string]$Message) {
 }
 
 function Invoke-Download([string]$Url, [string]$OutFile) {
-    Write-Host "  Downloading: $Url" -ForegroundColor Gray
-    Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
+    for ($Attempt = 1; $Attempt -le 5; $Attempt++) {
+        try {
+            Write-Host "  Downloading (attempt $Attempt/5): $Url" -ForegroundColor Gray
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing -TimeoutSec 300
+            return
+        } catch {
+            Write-Host "  Download failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            if ($Attempt -eq 5) { throw }
+            Start-Sleep -Seconds (5 * $Attempt)
+        }
+    }
 }
 
 function Assert-CommandSucceeded([string]$What, [int]$Code) {
