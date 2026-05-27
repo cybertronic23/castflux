@@ -164,7 +164,26 @@ try {
     if (-not (Test-Path $FfmpegExe)) {
         $FfmpegZip = Join-Path $DownloadDir "ffmpeg-release-essentials.zip"
         if (-not (Test-Path $FfmpegZip)) {
-            Invoke-Download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" $FfmpegZip
+            # Try multiple mirrors (China-friendly first)
+            $FfmpegUrls = @(
+                "https://mirrors.aliyun.com/ffmpeg/releases/ffmpeg-release-essentials.zip",
+                "https://mirrors.tuna.tsinghua.edu.cn/ffmpeg/releases/ffmpeg-release-essentials.zip",
+                "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+            )
+            $Downloaded = $false
+            foreach ($Url in $FfmpegUrls) {
+                try {
+                    Write-Host "  Trying: $Url" -ForegroundColor Gray
+                    Invoke-Download $Url $FfmpegZip
+                    $Downloaded = $true
+                    break
+                } catch {
+                    Write-Host "  Failed, trying next mirror..." -ForegroundColor Yellow
+                }
+            }
+            if (-not $Downloaded) {
+                throw "Failed to download ffmpeg from all mirrors"
+            }
         }
 
         if (Test-Path $FfmpegRoot) {
