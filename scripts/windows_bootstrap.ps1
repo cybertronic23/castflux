@@ -178,14 +178,11 @@ try {
         }
         
         if (-not $FfmpegZip) {
-            Write-Host ""
-            Write-Host "  ffmpeg not found. Please:" -ForegroundColor Yellow
-            Write-Host "  1. Download ffmpeg from https://www.gyan.dev/ffmpeg/builds/" -ForegroundColor Yellow
-            Write-Host "  2. Rename zip to ffmpeg.zip" -ForegroundColor Yellow
-            Write-Host "  3. Put it in: $DownloadDir" -ForegroundColor Yellow
-            Write-Host "  4. Run this script again" -ForegroundColor Yellow
-            Write-Host ""
-            throw "ffmpeg.zip not found in any of: $($Locations -join ', ')"
+            # Download from GitHub Release (fast CDN)
+            $FfmpegZip = Join-Path $DownloadDir "ffmpeg-release-essentials.zip"
+            $FfmpegUrl = "https://github.com/cybertronic23/castflux/releases/download/v1.0.4/ffmpeg-release-essentials.zip"
+            Write-Host "  Downloading ffmpeg from GitHub Release..." -ForegroundColor Gray
+            Invoke-Download $FfmpegUrl $FfmpegZip
         }
 
         if (Test-Path $FfmpegRoot) {
