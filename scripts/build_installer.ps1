@@ -9,8 +9,6 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $VendorDir = Join-Path $PSScriptRoot "vendor"
 $VendorDownloads = Join-Path $VendorDir "downloads"
 $WheelhouseDir = Join-Path $VendorDir "wheelhouse"
-$LauncherDir = Join-Path $PSScriptRoot "launcher"
-$LauncherOutDir = Join-Path $LauncherDir "bin\Release\net48"
 
 function Invoke-DownloadWithRetry {
     param(
@@ -77,24 +75,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "pip download failed (exit code: $LASTEXITCODE)"
 }
 
-Write-Host "[2/5] Compiling C# launcher..." -ForegroundColor Yellow
-
-# Check for dotnet SDK
-$dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not $dotnet) {
-    Write-Host "  [WARNING] dotnet SDK not found, skipping launcher compilation" -ForegroundColor Yellow
-    Write-Host "  Install .NET SDK from https://dotnet.microsoft.com/download" -ForegroundColor Yellow
-} else {
-    Write-Host "  Building CastFluxLauncher..." -ForegroundColor Gray
-    & dotnet build $LauncherDir\CastFluxLauncher.csproj -c Release -o $LauncherOutDir
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  [WARNING] Launcher build failed, installer will use batch file launcher" -ForegroundColor Yellow
-    } else {
-        Write-Host "  Launcher built: $LauncherOutDir\CastFlux.exe" -ForegroundColor Green
-    }
-}
-
-Write-Host "[3/5] Checking Inno Setup..." -ForegroundColor Yellow
+Write-Host "[2/4] Checking Inno Setup..." -ForegroundColor Yellow
 $InnoCandidates = @(
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
     "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
@@ -118,10 +99,10 @@ $OutputDir = Join-Path $RepoRoot "dist"
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
-Write-Host "[4/5] Output directory: $OutputDir" -ForegroundColor Yellow
+Write-Host "[3/4] Output directory: $OutputDir" -ForegroundColor Yellow
 
 $IssPath = Join-Path $PSScriptRoot "installer.iss"
-Write-Host "[5/5] Compiling installer..." -ForegroundColor Yellow
+Write-Host "[4/4] Compiling installer..." -ForegroundColor Yellow
 Write-Host "  ISCC: $InnoPath" -ForegroundColor Gray
 Write-Host "  ISS:  $IssPath" -ForegroundColor Gray
 

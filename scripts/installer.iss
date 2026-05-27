@@ -30,8 +30,6 @@ DisableWelcomePage=no
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; C# launcher (if compiled)
-Source: "launcher\bin\Release\net48\CastFlux.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; 核心 Python 包
 Source: "..\src\castflux\*.py"; DestDir: "{app}\src\castflux"; Flags: ignoreversion
 Source: "..\pyproject.toml"; DestDir: "{app}"; Flags: ignoreversion
@@ -53,19 +51,15 @@ Source: "vendor\wheelhouse\*"; DestDir: "{app}\runtime\wheelhouse"; Flags: ignor
 Source: "..\output_slices\.gitkeep"; DestDir: "{app}\output_slices"; Flags: ignoreversion
 
 [Icons]
-; Use C# launcher if compiled, otherwise use batch file
-Name: "{userdesktop}\CastFlux"; Filename: "{app}\CastFlux.exe"; WorkingDir: "{app}"; Comment: "CastFlux"; Check: FileExists(ExpandConstant('{app}\CastFlux.exe'))
-Name: "{userdesktop}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"; Comment: "CastFlux"; Check: not FileExists(ExpandConstant('{app}\CastFlux.exe'))
-Name: "{group}\CastFlux"; Filename: "{app}\CastFlux.exe"; WorkingDir: "{app}"; Check: FileExists(ExpandConstant('{app}\CastFlux.exe'))
-Name: "{group}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"; Check: not FileExists(ExpandConstant('{app}\CastFlux.exe'))
+Name: "{userdesktop}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"; Comment: "CastFlux"
+Name: "{group}\CastFlux"; Filename: "{app}\scripts\run_gui.bat"; WorkingDir: "{app}"
 Name: "{group}\Uninstall CastFlux"; Filename: "{uninstallexe}"
 
 [Run]
 ; 安装私有 Python、ffmpeg、项目依赖（窗口可见，让用户看到进度）
 Filename: "{app}\scripts\setup_gui.bat"; Parameters: "--installer"; StatusMsg: "正在配置环境（自动安装 Python / ffmpeg / 依赖，需几分钟）..."; Flags: waituntilterminated shellexec
-; 安装完成，可选启动 GUI (use C# launcher if available)
-Filename: "{app}\CastFlux.exe"; Description: "启动 CastFlux"; Flags: postinstall nowait skipifsilent shellexec unchecked; Check: FileExists(ExpandConstant('{app}\CastFlux.exe'))
-Filename: "{app}\scripts\run_gui.bat"; Description: "启动 CastFlux"; Flags: postinstall nowait skipifsilent shellexec unchecked; Check: not FileExists(ExpandConstant('{app}\CastFlux.exe'))
+; 安装完成，可选启动 GUI
+Filename: "{app}\scripts\run_gui.bat"; Description: "启动 CastFlux"; Flags: postinstall nowait skipifsilent shellexec unchecked
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\.venv"
