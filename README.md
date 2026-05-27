@@ -174,6 +174,25 @@ castflux/
 
 **两种方式都不需要你手动安装任何东西**，也不会污染系统 PATH。Release 安装包会尽量内置 Python、ffmpeg 和 Python wheels，客户电脑安装时优先离线完成；只有从源码直接双击 `setup_gui.bat` 且本地没有这些离线文件时，才会联网下载。安装日志会保存在 `runtime/logs/`，如果客户电脑网络不好，可以把这个日志发给开发者排查。
 
+**方式 C：网络不好？手动下载 ffmpeg（推荐国内用户）**
+
+如果自动下载 ffmpeg 失败（网络问题），可以手动下载：
+
+1. 下载 ffmpeg：
+   ```
+   https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+   ```
+
+2. 把下载的文件放到以下任一位置：
+   - `D:\castflux\runtime\downloads\ffmpeg-release-essentials.zip`
+   - `D:\castflux\ffmpeg.zip`
+
+3. 重新运行 `scripts\setup_gui.bat`
+
+脚本会自动检测到本地文件，跳过下载。
+
+> 💡 国内用户可以用迅雷或浏览器下载，速度更快。
+
 > ⚠ 第一次启动后，点界面右上角"设置"按钮，填入 `HF_TOKEN` 和 `DEEPSEEK_API_KEY`。
 > 不知道怎么获取？详见 [HuggingFace Token 配置](#huggingface-token-配置) 和 [LLM 提供商](#llm-提供商)。
 
