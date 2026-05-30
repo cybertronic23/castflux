@@ -14,6 +14,7 @@ set "SETUP_RC=%ERRORLEVEL%"
 if not "%SETUP_RC%"=="0" (
     echo.
     echo [ERROR] CastFlux setup failed. See runtime\logs for details.
+    echo You can run scripts\collect_support_logs.bat and send the zip file to the developer.
     pause
     exit /b %SETUP_RC%
 )

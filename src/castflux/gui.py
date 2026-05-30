@@ -3,6 +3,8 @@ import re
 import subprocess
 import sys
 import threading
+import zipfile
+from datetime import datetime
 
 # macOS: UV 管理的 Python 内置 Tcl/Tk 但路径不对
 # 引导 _tkinter 找到正确的 init.tcl / tk.tcl
@@ -16,6 +18,8 @@ if sys.platform == "darwin" and "TCL_LIBRARY" not in os.environ:
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
+
+from castflux import __version__
 
 
 def _load_env(env_path: str = ".env") -> dict:
@@ -81,6 +85,7 @@ class CastFluxGUI:
 
         self._build_ui()
         self.window.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.window.after(600, self._show_first_run_wizard_if_needed)
 
     def _build_ui(self):
         self.window.columnconfigure(0, weight=1)
@@ -181,8 +186,10 @@ class CastFluxGUI:
         bottom.grid(row=6, column=0, sticky="ew", padx=12, pady=(0, 12))
         ttk.Button(bottom, text="⚙ 设置 API Key", command=self._settings_dialog
                    ).pack(side="left")
+        ttk.Button(bottom, text="打包故障日志", command=self._collect_support_logs
+                   ).pack(side="left", padx=(8, 0))
         ttk.Label(bottom, text="").pack(side="left", fill="x", expand=True)
-        ttk.Label(bottom, text="v1.0", foreground="#b2bec3"
+        ttk.Label(bottom, text=f"v{__version__}", foreground="#b2bec3"
                   ).pack(side="right")
 
     # ---------- helpers ----------
@@ -297,6 +304,118 @@ class CastFluxGUI:
                    ).grid(row=len(keys) + 1, column=0, pady=16)
         ttk.Button(win, text="取消", command=win.destroy
                    ).grid(row=len(keys) + 1, column=1, pady=16, padx=(6, 12))
+
+    def _configuration_status(self) -> tuple[bool, list[str]]:
+        env = self._read_env()
+        missing = []
+        if not _configured_secret(env.get("HF_TOKEN")):
+            missing.append("HuggingFace Token")
+        if not (
+            _configured_secret(env.get("DEEPSEEK_API_KEY"))
+            or _configured_secret(env.get("QWEN_API_KEY"))
+            or _configured_secret(env.get("GLM_API_KEY"))
+            or _configured_secret(env.get("MINIMAX_API_KEY"))
+            or _configured_secret(env.get("OPENAI_API_KEY"))
+        ):
+            missing.append("AI API Key")
+        return len(missing) == 0, missing
+
+    def _show_first_run_wizard_if_needed(self):
+        ok, missing = self._configuration_status()
+        if ok:
+            return
+        self._show_first_run_wizard(missing)
+
+    def _show_first_run_wizard(self, missing: list[str]):
+        win = tk.Toplevel(self.window)
+        win.title("CastFlux 首次启动向导")
+        win.geometry("560x360")
+        win.resizable(False, False)
+        win.transient(self.window)
+        win.grab_set()
+
+        frame = ttk.Frame(win, padding=18)
+        frame.pack(fill="both", expand=True)
+        frame.columnconfigure(0, weight=1)
+
+        ttk.Label(frame, text="首次使用前还差最后一步",
+                  font=("", 15, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            frame,
+            text=(
+                "安装环境已经由安装包自动准备。现在只需要填入授权信息，"
+                "之后每次双击桌面 CastFlux 图标即可使用。"
+            ),
+            wraplength=510,
+            foreground="#4b5563",
+        ).grid(row=1, column=0, sticky="w", pady=(10, 12))
+
+        status = "待填写: " + "、".join(missing)
+        ttk.Label(frame, text=status, foreground="#b45309",
+                  font=("", 11, "bold")).grid(row=2, column=0, sticky="w")
+
+        ttk.Label(
+            frame,
+            text=(
+                "如果客户电脑网络较慢，首次处理视频时模型下载可能需要更久。"
+                "安装失败或无法启动时，点击“打包故障日志”，把生成的 zip 发给开发者。"
+            ),
+            wraplength=510,
+            foreground="#4b5563",
+        ).grid(row=3, column=0, sticky="w", pady=(14, 8))
+
+        buttons = ttk.Frame(frame)
+        buttons.grid(row=4, column=0, sticky="ew", pady=(18, 0))
+
+        def open_settings():
+            win.destroy()
+            self._settings_dialog()
+
+        ttk.Button(buttons, text="现在填写授权信息", command=open_settings
+                   ).pack(side="left")
+        ttk.Button(buttons, text="稍后再说", command=win.destroy
+                   ).pack(side="left", padx=(8, 0))
+        ttk.Button(buttons, text="打包故障日志", command=self._collect_support_logs
+                   ).pack(side="right")
+
+    def _collect_support_logs(self):
+        try:
+            root = Path.cwd()
+            support_dir = root / "runtime" / "support"
+            support_dir.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            zip_path = support_dir / f"castflux-support-{stamp}.zip"
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                logs_dir = root / "runtime" / "logs"
+                if logs_dir.exists():
+                    for path in logs_dir.rglob("*"):
+                        if path.is_file():
+                            zf.write(path, path.relative_to(root))
+
+                diag = [
+                    f"CastFlux version: {__version__}",
+                    f"Python: {sys.version}",
+                    f"Executable: {sys.executable}",
+                    f"Working directory: {root}",
+                    f"ffmpeg: {self._find_ffmpeg() or 'not found'}",
+                    f"Output directory: {self.output_dir.get()}",
+                ]
+                env = self._read_env()
+                for key in [
+                    "HF_TOKEN",
+                    "DEEPSEEK_API_KEY",
+                    "QWEN_API_KEY",
+                    "GLM_API_KEY",
+                    "MINIMAX_API_KEY",
+                    "OPENAI_API_KEY",
+                ]:
+                    diag.append(f"{key}: {'configured' if _configured_secret(env.get(key)) else 'missing'}")
+                zf.writestr("diagnostics.txt", "\n".join(diag) + "\n")
+
+            messagebox.showinfo("日志已打包", f"请把这个文件发给开发者:\n{zip_path}")
+        except Exception as e:
+            messagebox.showerror("打包失败", str(e))
 
     # ---------- pipeline ----------
 

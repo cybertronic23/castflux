@@ -8,26 +8,28 @@
 
 ## Windows 用户：下载 EXE 一键安装
 
-> 不用装 Python、不用装 ffmpeg、不用敲任何命令。下载 → 双击 → 填入 API Key → 开用。
+> 客户不需要 Git、Python、ffmpeg、命令行或环境变量知识。下载 → 双击 → 下一步 → 填授权信息 → 开用。
 
 **👇 下载 CastFlux 安装程序**
 <p align="left">
   <a href="https://github.com/cybertronic23/castflux/releases/latest">
     <img src="https://img.shields.io/github/v/release/cybertronic23/castflux?label=最新版本&color=blue">
   </a>
-  <a href="https://github.com/cybertronic23/castflux/releases/latest/download/CastFlux_Setup_1.0.0.exe">
+  <a href="https://github.com/cybertronic23/castflux/releases/latest">
     <img src="https://img.shields.io/badge/下载-Windows_安装程序-brightgreen?logo=windows">
   </a>
 </p>
 
 ```text
-① 下载 CastFlux_Setup_1.0.0.exe
+① 打开 Releases 页面，下载最新的 CastFlux_Setup_*.exe
 ② 双击运行，一路"下一步"
 ③ 安装程序内置私有 Python / ffmpeg / 全部依赖，自动配置
-④ 安装完成自动打开界面
-⑤ 点右上角"设置"，填入 HF_TOKEN 和 DEEPSEEK_API_KEY
+④ 安装完成后双击桌面 CastFlux 图标
+⑤ 首次启动向导会提示填写 HF_TOKEN 和 DEEPSEEK_API_KEY
 ⑥ 选择视频文件，开始切片！
 ```
+
+给客户看的极简说明见: [docs/WINDOWS_QUICK_START.md](docs/WINDOWS_QUICK_START.md)
 
 > 需要 GitHub Token？→ [HuggingFace Token 配置](#huggingface-token-配置)  
 > 需要 API Key？→ [LLM 提供商](#llm-提供商)
@@ -119,6 +121,7 @@ castflux/
 │   ├── setup_gui.bat         # Windows 一键安装入口
 │   ├── windows_bootstrap.ps1 # Windows 私有 Python/ffmpeg/依赖自举脚本
 │   ├── run_gui.bat           # Windows 双击启动 GUI
+│   ├── collect_support_logs.bat # Windows 故障日志打包脚本
 │   ├── installer.iss         # Inno Setup 安装程序脚本
 │   ├── build_installer.ps1   # 安装程序构建脚本（Windows）
 │   ├── setup.sh              # macOS/Linux 一键安装脚本
@@ -131,6 +134,7 @@ castflux/
 ├── .github/workflows/        # GitHub Actions 构建工作流
 ├── Dockerfile                # 容器化部署
 ├── docker-compose.yml        # Docker Compose 配置
+├── docs/                     # 用户交付说明
 ├── pyproject.toml             # 项目配置 + CLI 入口
 ├── README.md
 ├── .env.example              # 环境变量模板
@@ -147,7 +151,7 @@ castflux/
 
 > 无需任何命令行操作，双击即可。
 
-有两种方式，任选其一：
+小白客户只使用方式 A。方式 B 只给开发者或懂源码安装的人使用。
 
 **方式 A：下载 EXE 安装程序（推荐）**
 
@@ -156,6 +160,8 @@ castflux/
 ```text
 下载 → 双击 → 下一步 → 完成 → 开用！
 ```
+
+客户电脑不需要安装 Git，也不需要克隆仓库。把 Release 页面或 `CastFlux_Setup_*.exe` 文件直接发给客户即可。
 
 **方式 B：双击 setup_gui.bat（从源码安装）**
 
@@ -172,7 +178,7 @@ castflux/
 步骤 2:  双击桌面 "CastFlux" 图标 （以后每次都双击这个）
 ```
 
-**两种方式都不需要你手动安装任何东西**，也不会污染系统 PATH。Release 安装包会尽量内置 Python、ffmpeg 和 Python wheels，客户电脑安装时优先离线完成；只有从源码直接双击 `setup_gui.bat` 且本地没有这些离线文件时，才会联网下载。安装日志会保存在 `runtime/logs/`，如果客户电脑网络不好，可以把这个日志发给开发者排查。
+**两种方式都不需要你手动安装任何东西**，也不会污染系统 PATH。Release 安装包会尽量内置 Python、ffmpeg 和 Python wheels，客户电脑安装时优先离线完成；只有从源码直接双击 `setup_gui.bat` 且本地没有这些离线文件时，才会联网下载。安装日志会保存在 `runtime/logs/`。如果客户电脑网络不好或启动失败，让客户点击窗口底部“打包故障日志”，或从开始菜单运行“打包 CastFlux 故障日志”，把生成的 zip 发给开发者排查。
 
 **方式 C：网络不好？手动下载 ffmpeg（推荐国内用户）**
 

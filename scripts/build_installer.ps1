@@ -6,6 +6,11 @@ $ErrorActionPreference = "Stop"
 
 $PythonVersion = "3.11.9"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$PyProjectPath = Join-Path $RepoRoot "pyproject.toml"
+$ProjectVersion = (
+    Select-String -Path $PyProjectPath -Pattern '^version\s*=\s*"([^"]+)"' |
+    Select-Object -First 1
+).Matches.Groups[1].Value
 $VendorDir = Join-Path $PSScriptRoot "vendor"
 $VendorDownloads = Join-Path $VendorDir "downloads"
 $WheelhouseDir = Join-Path $VendorDir "wheelhouse"
@@ -105,8 +110,9 @@ $IssPath = Join-Path $PSScriptRoot "installer.iss"
 Write-Host "[4/4] Compiling installer..." -ForegroundColor Yellow
 Write-Host "  ISCC: $InnoPath" -ForegroundColor Gray
 Write-Host "  ISS:  $IssPath" -ForegroundColor Gray
+Write-Host "  Version: $ProjectVersion" -ForegroundColor Gray
 
-& $InnoPath $IssPath
+& $InnoPath "/DMyAppVersion=$ProjectVersion" $IssPath
 if ($LASTEXITCODE -ne 0) {
     throw "ISCC failed (exit code: $LASTEXITCODE)"
 }

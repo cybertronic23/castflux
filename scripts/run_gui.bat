@@ -25,5 +25,6 @@ if errorlevel 1 (
     echo.
     echo [ERROR] CastFlux failed to start.
     echo Please run scripts\setup_gui.bat again or check runtime\logs.
+    echo If you need help, run scripts\collect_support_logs.bat and send the zip file to the developer.
     pause
 )

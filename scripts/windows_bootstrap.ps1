@@ -178,11 +178,25 @@ try {
         }
         
         if (-not $FfmpegZip) {
-            # Download from GitHub Release (fast CDN)
             $FfmpegZip = Join-Path $DownloadDir "ffmpeg-release-essentials.zip"
-            $FfmpegUrl = "https://github.com/cybertronic23/castflux/releases/download/v1.0.4/ffmpeg-release-essentials.zip"
-            Write-Host "  Downloading ffmpeg from GitHub Release..." -ForegroundColor Gray
-            Invoke-Download $FfmpegUrl $FfmpegZip
+            $FfmpegUrls = @(
+                "https://github.com/cybertronic23/castflux/releases/latest/download/ffmpeg-release-essentials.zip",
+                "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+            )
+            $Downloaded = $false
+            foreach ($Url in $FfmpegUrls) {
+                try {
+                    Write-Host "  Downloading ffmpeg..." -ForegroundColor Gray
+                    Invoke-Download $Url $FfmpegZip
+                    $Downloaded = $true
+                    break
+                } catch {
+                    Write-Host "  ffmpeg download source failed: $Url" -ForegroundColor Yellow
+                }
+            }
+            if (-not $Downloaded) {
+                throw "ffmpeg download failed. Please ask the developer for an offline installer."
+            }
         }
 
         if (Test-Path $FfmpegRoot) {
