@@ -15,10 +15,14 @@ SYSTEM_PROMPT = """你是一个短视频运营专家，擅长将直播中的问�
 下面是一段"粉丝提问→博主回答"的完整文字记录。请完成以下任务：
 1. 提取核心信息：明确指出目标人群、具体问题、博主给出的解决方法（一句话总结）。
 2. 生成一个爆款短视频标题（15字以内），必须包含"人群+问题+解决方法"的结构，吸引点击。
-3. 生成"前情提要"：不是普通摘要，而是视频开头3秒用来抓人的爆点/干货/冲突文案。
+3. 生成"前情提要"：不是普通摘要，而是视频开头用来抓人的爆点/干货/冲突文案。
    - 必须浓缩这轮对话里最值得看的矛盾、反常识或解决方案。
    - 20到45字，允许两句短句。
    - 不要使用"精彩问答"、"马上开始"这类空话。
+4. 从原文中选出一句最适合作为"高能精华视频"的原话，放到 hook_quote。
+   - 必须尽量原样摘自博主回答或粉丝提问，不能自己改写。
+   - 优先选择最有冲突、反常识、干货密度高的句子。
+   - 这句话会被程序用词级时间戳定位并截取成视频前情提要。
 
 请按JSON格式返回，不要加其他文字：
 {
@@ -26,7 +30,8 @@ SYSTEM_PROMPT = """你是一个短视频运营专家，擅长将直播中的问�
   "problem": "遇到的问题",
   "solution": "解决方法",
   "title": "爆款标题",
-  "teaser": "前情提要文字"
+  "teaser": "前情提要文字",
+  "hook_quote": "用于截取高能精华视频的原文句子"
 }"""
 
 PROVIDER_CONFIG = {
@@ -114,6 +119,7 @@ def _call_llm(block_text: str, client: OpenAI, model: str) -> dict:
             return {
                 "teaser": data.get("teaser", "").strip(),
                 "title": data.get("title", "").strip(),
+                "hook_quote": data.get("hook_quote", "").strip(),
                 "crowd": data.get("crowd", "").strip(),
                 "problem": data.get("problem", "").strip(),
                 "solution": data.get("solution", "").strip(),
@@ -126,6 +132,7 @@ def _call_llm(block_text: str, client: OpenAI, model: str) -> dict:
     return {
         "teaser": "这个问题很多人踩坑，解决方法其实很直接",
         "title": "直播精华问答",
+        "hook_quote": "",
         "crowd": "用户",
         "problem": "常见问题",
         "solution": "专家解答",

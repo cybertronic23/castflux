@@ -53,7 +53,7 @@ def main():
         with open(transcript_path, "w", encoding="utf-8") as f:
             json.dump({"words": words, "segments": segments}, f, ensure_ascii=False, indent=2)
 
-        qa_blocks = find_qa_blocks(segments, target_count=args.num_slices)
+        qa_blocks = find_qa_blocks(segments, target_count=args.num_slices, words=words)
 
         metas = batch_generate(
             qa_blocks,

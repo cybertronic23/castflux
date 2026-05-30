@@ -2,8 +2,10 @@ import concurrent.futures
 import json
 import logging
 import os
+import re
 import subprocess
 import tempfile
+from difflib import SequenceMatcher
 from datetime import timedelta
 from pathlib import Path
 
@@ -133,6 +135,117 @@ def _atempo_filter(speed: float) -> str:
     return ",".join(parts)
 
 
+def _normalize_text(text: str) -> str:
+    return re.sub(r"[\s，。！？、：；,.!?:;\"'“”‘’（）()【】\[\]《》<>]+", "", text or "")
+
+
+def _bounded_range(
+    start: float,
+    end: float,
+    block_start: float,
+    block_end: float,
+    min_duration: float,
+    max_duration: float,
+) -> tuple[float, float]:
+    start = max(block_start, start)
+    end = min(block_end, end)
+    duration = max(0.1, end - start)
+
+    if duration > max_duration:
+        center = (start + end) / 2
+        start = center - max_duration / 2
+        end = center + max_duration / 2
+    elif duration < min_duration:
+        center = (start + end) / 2
+        start = center - min_duration / 2
+        end = center + min_duration / 2
+
+    if start < block_start:
+        end += block_start - start
+        start = block_start
+    if end > block_end:
+        start -= end - block_end
+        end = block_end
+    return max(block_start, start), min(block_end, end)
+
+
+def _locate_hook_range(
+    block: dict,
+    hook_quote: str,
+    min_duration: float = 3.0,
+    max_duration: float = 14.0,
+) -> tuple[float, float]:
+    block_start = float(block["start_time"])
+    block_end = float(block["end_time"])
+    target = _normalize_text(hook_quote)
+    words = block.get("words") or []
+
+    if target and words:
+        chars: list[str] = []
+        char_to_word: list[int] = []
+        for idx, word in enumerate(words):
+            normalized = _normalize_text(word.get("word", ""))
+            for char in normalized:
+                chars.append(char)
+                char_to_word.append(idx)
+
+        text = "".join(chars)
+        if text:
+            best = (0.0, 0, min(len(text), max(1, len(target))))
+            target_len = max(1, len(target))
+            min_len = max(1, int(target_len * 0.65))
+            max_len = min(len(text), max(target_len + 12, int(target_len * 1.35)))
+            for start_idx in range(len(text)):
+                for length in (target_len, min_len, max_len):
+                    end_idx = min(len(text), start_idx + length)
+                    if end_idx <= start_idx:
+                        continue
+                    score = SequenceMatcher(None, target, text[start_idx:end_idx]).ratio()
+                    if score > best[0]:
+                        best = (score, start_idx, end_idx)
+            if best[0] >= 0.45:
+                start_word = words[char_to_word[best[1]]]
+                end_word = words[char_to_word[max(best[2] - 1, best[1])]]
+                return _bounded_range(
+                    float(start_word["start"]) - 0.8,
+                    float(end_word["end"]) + 0.8,
+                    block_start,
+                    block_end,
+                    min_duration,
+                    max_duration,
+                )
+
+    best_segment = None
+    best_score = -1.0
+    for segment in block.get("segments") or []:
+        text = _normalize_text(segment.get("text", ""))
+        if not text:
+            continue
+        score = SequenceMatcher(None, target, text).ratio() if target else len(text)
+        if score > best_score:
+            best_score = score
+            best_segment = segment
+
+    if best_segment:
+        return _bounded_range(
+            float(best_segment["start"]) - 0.8,
+            float(best_segment["end"]) + 0.8,
+            block_start,
+            block_end,
+            min_duration,
+            max_duration,
+        )
+
+    return _bounded_range(
+        block_start,
+        min(block_end, block_start + max_duration),
+        block_start,
+        block_end,
+        min_duration,
+        max_duration,
+    )
+
+
 def _run_ffmpeg(cmd: list[str], label: str):
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=900)
@@ -141,37 +254,17 @@ def _run_ffmpeg(cmd: list[str], label: str):
         raise
 
 
-def _process_single_block(
+def _render_clip(
     video_path: str,
-    output_dir: Path,
-    block: dict,
-    meta: dict,
-    index: int,
+    output_path: str,
+    start: float,
+    end: float,
     speed: float,
-    font_path: str,
-) -> dict:
-    teaser = meta.get("teaser") or "精彩问答马上开始"
-    title = meta.get("title") or "直播精华问答"
-
-    start = max(0, block["start_time"] - 0.5)
-    end = block["end_time"]
-    duration = end - start
-
-    output_file = output_dir / f"part_{index + 1:02d}.mp4"
-    temp_files: list[str] = []
-
+    label: str,
+):
+    duration = max(0.1, end - start)
     video_pts = 1.0 / speed
-    video_size = _probe_video_size(video_path)
-    intro_card = _create_intro_card(teaser, title, font_path, video_size)
-    temp_files.append(intro_card)
-
-    content_fd, content_path = tempfile.mkstemp(suffix=".mp4")
-    intro_fd, intro_path = tempfile.mkstemp(suffix=".mp4")
-    os.close(content_fd)
-    os.close(intro_fd)
-    temp_files.extend([content_path, intro_path])
-
-    content_cmd = [
+    cmd = [
         "ffmpeg", "-y",
         "-ss", str(timedelta(seconds=start)),
         "-i", video_path,
@@ -186,8 +279,42 @@ def _process_single_block(
         "-c:a", "aac",
         "-b:a", "128k",
         "-avoid_negative_ts", "make_zero",
-        content_path,
+        output_path,
     ]
+    _run_ffmpeg(cmd, label)
+
+
+def _process_single_block(
+    video_path: str,
+    output_dir: Path,
+    block: dict,
+    meta: dict,
+    index: int,
+    speed: float,
+    font_path: str,
+) -> dict:
+    teaser = meta.get("teaser") or "精彩问答马上开始"
+    title = meta.get("title") or "直播精华问答"
+    hook_quote = meta.get("hook_quote") or teaser
+
+    start = max(0, block["start_time"] - 0.5)
+    end = block["end_time"]
+    hook_start, hook_end = _locate_hook_range(block, hook_quote)
+
+    output_file = output_dir / f"part_{index + 1:02d}.mp4"
+    temp_files: list[str] = []
+
+    video_size = _probe_video_size(video_path)
+    intro_card = _create_intro_card(teaser, title, font_path, video_size)
+    temp_files.append(intro_card)
+
+    content_fd, content_path = tempfile.mkstemp(suffix=".mp4")
+    intro_fd, intro_path = tempfile.mkstemp(suffix=".mp4")
+    hook_fd, hook_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(content_fd)
+    os.close(intro_fd)
+    os.close(hook_fd)
+    temp_files.extend([content_path, intro_path, hook_path])
 
     intro_cmd = [
         "ffmpeg", "-y",
@@ -209,8 +336,9 @@ def _process_single_block(
     concat_cmd = [
         "ffmpeg", "-y",
         "-i", intro_path,
+        "-i", hook_path,
         "-i", content_path,
-        "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[vout][aout]",
+        "-filter_complex", "[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[vout][aout]",
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264",
@@ -222,8 +350,9 @@ def _process_single_block(
     ]
 
     try:
-        _run_ffmpeg(content_cmd, f"切片 {index + 1} 内容")
         _run_ffmpeg(intro_cmd, f"切片 {index + 1} 前情提要")
+        _render_clip(video_path, hook_path, hook_start, hook_end, speed, f"切片 {index + 1} 高能精华")
+        _render_clip(video_path, content_path, start, end, speed, f"切片 {index + 1} 内容")
         _run_ffmpeg(concat_cmd, f"切片 {index + 1} 合成")
     finally:
         for temp_file in temp_files:
@@ -236,6 +365,10 @@ def _process_single_block(
         "index": index + 1,
         "title": title,
         "teaser": teaser,
+        "hook_quote": hook_quote,
+        "hook_start_time": round(hook_start, 2),
+        "hook_end_time": round(hook_end, 2),
+        "hook_duration": round(hook_end - hook_start, 2),
         "crowd": meta.get("crowd", ""),
         "problem": meta.get("problem", ""),
         "solution": meta.get("solution", ""),
@@ -290,6 +423,8 @@ def save_manifest(titles: list[dict], output_dir: Path):
             f.write(
                 f"P{item['index']:02d} | {item['title']}\n"
                 f"      前情提要: {item.get('teaser', '')}\n"
+                f"      高能原话: {item.get('hook_quote', '')}\n"
+                f"      高能片段: {item.get('hook_start_time', '')}s - {item.get('hook_end_time', '')}s\n"
                 f"      人群: {item['crowd']} | 问题: {item['problem']} | 解法: {item['solution']}\n"
                 f"      文件: {item['file']}\n\n"
             )

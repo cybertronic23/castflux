@@ -8,6 +8,7 @@ def find_qa_blocks(
     segments: list[dict],
     target_count: int | None = None,
     host_speaker: str | None = None,
+    words: list[dict] | None = None,
 ) -> list[dict]:
     speaker_counts = Counter(s["speaker"] for s in segments if s["speaker"] != "UNKNOWN")
     if not speaker_counts:
@@ -24,22 +25,36 @@ def find_qa_blocks(
             if i + 1 < len(segments) and segments[i + 1]["speaker"] == host:
                 question = dict(cur)
                 answer = dict(segments[i + 1])
+                block_segments = [dict(question), dict(segments[i + 1])]
                 j = i + 2
                 while j < len(segments) and segments[j]["speaker"] == host:
                     answer["end"] = segments[j]["end"]
                     answer["text"] += " " + segments[j]["text"]
+                    block_segments.append(dict(segments[j]))
                     j += 1
 
+                start_time = question["start"]
+                end_time = answer["end"]
+                block_words = []
+                if words:
+                    block_words = [
+                        dict(w)
+                        for w in words
+                        if start_time <= w.get("start", 0) <= end_time
+                    ]
+
                 qa_blocks.append({
-                    "start_time": question["start"],
-                    "end_time": answer["end"],
+                    "start_time": start_time,
+                    "end_time": end_time,
                     "question_text": question["text"].strip(),
                     "answer_text": answer["text"].strip(),
                     "full_text": (
                         f"【粉丝提问】{question['text'].strip()}\n"
                         f"【博主回答】{answer['text'].strip()}"
                     ),
-                    "duration": answer["end"] - question["start"],
+                    "duration": end_time - start_time,
+                    "segments": block_segments,
+                    "words": block_words,
                 })
                 i = j
                 continue
