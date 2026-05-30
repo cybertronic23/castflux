@@ -76,7 +76,9 @@ $PipWheelArgs = @(
 ) + $Deps
 & python @PipWheelArgs
 if ($LASTEXITCODE -ne 0) {
-    throw "pip wheel failed (exit code: $LASTEXITCODE)"
+    Write-Host "  [WARN] Full wheelhouse build failed (exit code: $LASTEXITCODE)." -ForegroundColor Yellow
+    Write-Host "  The installer will still be generated with any wheels already available." -ForegroundColor Yellow
+    Write-Host "  Customer setup will fall back to online package indexes for missing wheels." -ForegroundColor Yellow
 }
 
 Write-Host "[2/4] Checking Inno Setup..." -ForegroundColor Yellow
