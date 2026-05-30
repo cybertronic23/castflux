@@ -1,6 +1,6 @@
 [project]
 name = "castflux"
-version = "1.0.9"
+version = "1.0.10"
 description = "直播内容切片流水线——自动提取问答片段，生成爆款短视频"
 requires-python = ">=3.10"
 license = "MIT"

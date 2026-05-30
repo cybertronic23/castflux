@@ -3,7 +3,7 @@
 
 #define MyAppName "CastFlux"
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.9"
+#define MyAppVersion "1.0.10"
 #endif
 #define MyAppPublisher "cybertronic23"
 #define MyAppURL "https://github.com/cybertronic23/castflux"
@@ -30,7 +30,6 @@ DisableWelcomePage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
 ; 核心 Python 包
