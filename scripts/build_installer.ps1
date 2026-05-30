@@ -66,18 +66,17 @@ $Deps = @(
     "Pillow>=10.0.0"
 )
 
-Write-Host "  Downloading Python wheels into $WheelhouseDir" -ForegroundColor Gray
-$PipDownloadArgs = @(
-    "-m", "pip", "download",
-    "--dest", $WheelhouseDir,
+Write-Host "  Building Python wheelhouse into $WheelhouseDir" -ForegroundColor Gray
+$PipWheelArgs = @(
+    "-m", "pip", "wheel",
+    "--wheel-dir", $WheelhouseDir,
     "--prefer-binary",
-    "--only-binary=:all:",
     "--retries", "10",
     "--timeout", "120"
 ) + $Deps
-& python @PipDownloadArgs
+& python @PipWheelArgs
 if ($LASTEXITCODE -ne 0) {
-    throw "pip download failed (exit code: $LASTEXITCODE)"
+    throw "pip wheel failed (exit code: $LASTEXITCODE)"
 }
 
 Write-Host "[2/4] Checking Inno Setup..." -ForegroundColor Yellow

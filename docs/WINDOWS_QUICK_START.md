@@ -11,14 +11,14 @@ https://github.com/cybertronic23/castflux/releases/latest
 下载页面里的 Windows 安装包:
 
 ```text
-CastFlux_Setup_1.0.6.exe
+CastFlux_Setup_1.0.7.exe
 ```
 
 如果浏览器提示“此文件不常下载”或 Windows 提示“是否允许此应用更改设备”，选择保留/允许即可。
 
 ## 2. 双击安装
 
-双击 `CastFlux_Setup_1.0.6.exe`，按照安装窗口提示点击“下一步”。
+双击 `CastFlux_Setup_1.0.7.exe`，按照安装窗口提示点击“下一步”。
 
 安装包会自动准备:
 
