@@ -57,6 +57,75 @@ function Assert-CommandSucceeded([string]$What, [int]$Code) {
     }
 }
 
+function Test-ExecutableFile([string]$Path) {
+    return (Test-Path $Path -PathType Leaf)
+}
+
+function Install-PrivatePython {
+    $InstallerPath = Join-Path $DownloadDir "python-$PythonVersion-amd64.exe"
+    if (-not (Test-ExecutableFile $InstallerPath)) {
+        Invoke-Download "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe" $InstallerPath
+    }
+
+    if ((Test-Path $PythonDir) -and -not (Test-ExecutableFile $PythonExe)) {
+        Write-Host "  Removing incomplete Python directory: $PythonDir" -ForegroundColor Yellow
+        Remove-Item $PythonDir -Recurse -Force
+    }
+
+    $PythonInstallLog = Join-Path $LogDir ("python-installer-{0:yyyyMMdd-HHmmss}.log" -f (Get-Date))
+    $PythonArgs = @(
+        "/quiet",
+        "InstallAllUsers=0",
+        "TargetDir=`"$PythonDir`"",
+        "Include_pip=1",
+        "Include_tcltk=1",
+        "Include_launcher=0",
+        "Include_test=0",
+        "PrependPath=0",
+        "Shortcuts=0",
+        "SimpleInstall=1",
+        "/log",
+        "`"$PythonInstallLog`""
+    ) -join " "
+
+    Write-Host "  Python installer: $InstallerPath" -ForegroundColor Gray
+    Write-Host "  Python install log: $PythonInstallLog" -ForegroundColor Gray
+    $Process = Start-Process -FilePath $InstallerPath -ArgumentList $PythonArgs -Wait -PassThru
+    Assert-CommandSucceeded "Python installer" $Process.ExitCode
+
+    if (-not (Test-ExecutableFile $PythonExe)) {
+        $FoundPython = Get-ChildItem $PythonDir -Recurse -Filter "python.exe" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notlike "*\Scripts\python.exe" } |
+            Select-Object -First 1
+        if ($FoundPython) {
+            Write-Host "  Found Python at non-standard path: $($FoundPython.FullName)" -ForegroundColor Yellow
+            $script:PythonExe = $FoundPython.FullName
+        }
+    }
+
+    if (-not (Test-ExecutableFile $PythonExe)) {
+        Write-Host "  Python directory contents:" -ForegroundColor Yellow
+        if (Test-Path $PythonDir) {
+            Get-ChildItem $PythonDir -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host "    $($_.FullName)" -ForegroundColor Gray
+            }
+        } else {
+            Write-Host "    $PythonDir does not exist" -ForegroundColor Gray
+        }
+        throw "Python was not installed to $PythonExe. See $PythonInstallLog"
+    }
+}
+
+function Assert-PrivatePython {
+    if (-not (Test-ExecutableFile $PythonExe)) {
+        throw "Private Python is missing or not a file: $PythonExe"
+    }
+    & $PythonExe --version
+    Assert-CommandSucceeded "Python version check" $LASTEXITCODE
+    & $PythonExe -c "import tkinter, ensurepip; print('  tkinter and pip are available')"
+    Assert-CommandSucceeded "Python tkinter/pip check" $LASTEXITCODE
+}
+
 function Get-PipIndexes {
     $Indexes = @()
     if ($env:PIP_INDEX_URL) {
@@ -125,33 +194,13 @@ try {
     Write-Host "Log: $LogFile"
 
     Write-Step "[1/5] Preparing private Python $PythonVersion"
-    if (-not (Test-Path $PythonExe)) {
-        $InstallerPath = Join-Path $DownloadDir "python-$PythonVersion-amd64.exe"
-        if (-not (Test-Path $InstallerPath)) {
-            Invoke-Download "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe" $InstallerPath
-        }
-
-        New-Item -ItemType Directory -Force -Path $PythonDir | Out-Null
-        $PythonArgs = @(
-            "/quiet",
-            "InstallAllUsers=0",
-            "TargetDir=`"$PythonDir`"",
-            "Include_pip=1",
-            "Include_tcltk=1",
-            "Include_launcher=0",
-            "Include_test=0",
-            "PrependPath=0",
-            "Shortcuts=0",
-            "SimpleInstall=1"
-        )
-        $Process = Start-Process -FilePath $InstallerPath -ArgumentList $PythonArgs -Wait -PassThru
-        Assert-CommandSucceeded "Python installer" $Process.ExitCode
+    if (-not (Test-ExecutableFile $PythonExe)) {
+        Install-PrivatePython
     }
-    & $PythonExe --version
-    & $PythonExe -c "import tkinter, ensurepip; print('  tkinter and pip are available')"
+    Assert-PrivatePython
 
     Write-Step "[2/5] Creating Python virtual environment"
-    if (-not (Test-Path $VenvPython)) {
+    if (-not (Test-ExecutableFile $VenvPython)) {
         & $PythonExe -m venv $VenvDir
         Assert-CommandSucceeded "venv creation" $LASTEXITCODE
     }
@@ -161,7 +210,7 @@ try {
     Invoke-PipInstall -Description "CastFlux dependency installation" -Arguments @("-e", $AppRoot)
 
     Write-Step "[4/5] Preparing local ffmpeg"
-    if (-not (Test-Path $FfmpegExe)) {
+    if (-not (Test-ExecutableFile $FfmpegExe)) {
         # Check multiple locations for ffmpeg zip
         $FfmpegZip = $null
         $Locations = @(
@@ -170,7 +219,7 @@ try {
             (Join-Path $DownloadDir "ffmpeg-release-essentials.zip")
         )
         foreach ($Loc in $Locations) {
-            if (Test-Path $Loc) {
+            if (Test-ExecutableFile $Loc) {
                 $FfmpegZip = $Loc
                 Write-Host "  Found ffmpeg at: $Loc" -ForegroundColor Gray
                 break
