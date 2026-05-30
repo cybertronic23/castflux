@@ -69,6 +69,9 @@ def check_prerequisites(provider: str | None = None):
 
 def resolve_font_path() -> str:
     candidates = [
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
         "/System/Library/Fonts/PingFang.ttc",
         "/System/Library/Fonts/Helvetica.ttc",
         "/System/Library/Fonts/HelveticaNeue.ttc",
@@ -107,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("video", help="输入 MP4 视频文件路径")
     parser.add_argument("-o", "--output", default="output_slices", help="输出目录 (默认: output_slices)")
     parser.add_argument("--model", default="auto", help=f"Whisper 模型大小 (默认: auto, 有 GPU→large-v3, 无 GPU→base; 可选: tiny/base/small/medium/large-v3)")
-    parser.add_argument("--num-slices", type=int, default=10, help="输出切片数量 (默认: 10)")
+    parser.add_argument("--num-slices", type=int, default=0, help="输出切片数量 (默认: 0 自动识别全部信息块；指定正整数则选取信息量最大的 N 个)")
     parser.add_argument("--speed", type=float, default=1.3, help="视频加速倍率 (默认: 1.3)")
     parser.add_argument("--llm-provider", default=None, help=f"LLM 提供商 ({available}), 默认: {DEFAULT_PROVIDER}, 也支持 LLM_PROVIDER 环境变量")
     parser.add_argument("--llm-model", default=None, help="LLM 模型名 (如 deepseek-chat, qwen-plus), 也支持 LLM_MODEL 环境变量")

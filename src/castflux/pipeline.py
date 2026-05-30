@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from castflux.cli import build_parser, check_prerequisites, resolve_font_path, setup_logging
+from castflux.env import load_env_files
 from castflux.audio import extract_audio
 from castflux.transcribe import transcribe_audio
 from castflux.diarize import diarize_audio, assign_speakers_to_words, build_speaker_segments
@@ -19,6 +20,7 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
+    load_env_files(include_home=True)
     setup_logging(args.verbose)
     logger.info("=" * 50)
     logger.info("CastFlux 启动")

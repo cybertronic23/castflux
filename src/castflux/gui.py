@@ -20,30 +20,15 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 
 from castflux import __version__
+from castflux.env import app_root, configured_secret, read_env_file, read_env_files
 
 
 def _load_env(env_path: str = ".env") -> dict:
-    extra = {}
-    if not os.path.exists(env_path):
-        return extra
-    with open(env_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            extra[k.strip()] = v.strip()
-    return extra
+    return read_env_file(env_path)
 
 
 def _configured_secret(value: str | None) -> bool:
-    if not value:
-        return False
-    value = value.strip()
-    if not value:
-        return False
-    placeholders = ("你的", "your_", "your-", "sk-...", "hf_...")
-    return not any(marker in value.lower() for marker in placeholders)
+    return configured_secret(value)
 
 
 STEPS = [
@@ -75,7 +60,7 @@ class CastFluxGUI:
         self.video_path = tk.StringVar()
         self.output_dir = tk.StringVar(value="output_slices")
         self.model = tk.StringVar(value="tiny")
-        self.num_slices = tk.IntVar(value=4)
+        self.num_slices = tk.IntVar(value=0)
         self.speed = tk.DoubleVar(value=1.3)
 
         self.running = False
@@ -132,8 +117,8 @@ class CastFluxGUI:
                                         width=10, state="readonly")
         self.model_combo.grid(row=0, column=1, padx=(0, 20), sticky="w")
 
-        ttk.Label(pf, text="切片数:").grid(row=0, column=2, padx=(0, 4))
-        ttk.Spinbox(pf, from_=1, to=20, textvariable=self.num_slices,
+        ttk.Label(pf, text="切片数(0自动):").grid(row=0, column=2, padx=(0, 4))
+        ttk.Spinbox(pf, from_=0, to=20, textvariable=self.num_slices,
                     width=6).grid(row=0, column=3, padx=(0, 20), sticky="w")
 
         ttk.Label(pf, text="倍速:").grid(row=0, column=4, padx=(0, 4))
@@ -249,10 +234,7 @@ class CastFluxGUI:
     # ---------- settings ----------
 
     def _read_env(self):
-        env = {}
-        for p in [".env", os.path.expanduser("~/.env")]:
-            env.update(_load_env(p))
-        return env
+        return read_env_files(include_home=True)
 
     def _settings_dialog(self):
         env = self._read_env()
@@ -293,7 +275,7 @@ class CastFluxGUI:
                 if val:
                     lines.append(f"{key}={val}")
             try:
-                with open(".env", "w", encoding="utf-8") as f:
+                with open(app_root() / ".env", "w", encoding="utf-8") as f:
                     f.write("\n".join(lines) + "\n")
                 messagebox.showinfo("保存成功", "API Key 已保存到 .env 文件", parent=win)
                 win.destroy()
@@ -421,7 +403,7 @@ class CastFluxGUI:
 
     def _build_env(self) -> dict:
         env = os.environ.copy()
-        env.update(_load_env(".env"))
+        env.update(read_env_files(include_home=True))
         local_ffmpeg = str(Path(__file__).resolve().parent.parent.parent
                            / "scripts" / "ffmpeg" / "bin")
         if os.path.isdir(local_ffmpeg) and local_ffmpeg not in env.get("PATH", ""):

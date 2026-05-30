@@ -13,44 +13,132 @@ from tqdm import tqdm
 logger = logging.getLogger("castflux")
 
 
-def _has_drawtext() -> bool:
-    """检测 ffmpeg 是否支持 drawtext 滤镜。"""
-    try:
-        result = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True)
-        return "drawtext" in result.stdout
-    except FileNotFoundError:
-        raise RuntimeError("ffmpeg not found")
+def _probe_video_size(video_path: str) -> tuple[int, int]:
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=width,height",
+        "-of", "csv=s=x:p=0",
+        video_path,
+    ]
+    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    width, height = result.stdout.strip().split("x")
+    return int(width), int(height)
 
 
-def _create_text_overlay(
-    text: str, font_path: str, video_size: tuple[int, int] = (1280, 720),
-    fontsize: int = 40,
-) -> str:
-    """用 Pillow 生成带文字的半透明底条 PNG，返回临时文件路径。"""
-    img = Image.new("RGBA", video_size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
+def _load_font(font_path: str, size: int):
     try:
-        font = ImageFont.truetype(font_path, fontsize)
+        return ImageFont.truetype(font_path, size)
     except (OSError, AttributeError):
-        font = ImageFont.load_default()
+        return ImageFont.load_default()
 
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    pad = 10
-    x = (video_size[0] - text_w) // 2
-    y = video_size[1] // 4 - text_h // 2
 
-    draw.rectangle(
-        [x - pad, y - pad, x + text_w + pad, y + text_h + pad],
-        fill=(0, 0, 0, 153),
+def _wrap_by_pixels(text: str, draw: ImageDraw.ImageDraw, font, max_width: int) -> list[str]:
+    lines: list[str] = []
+    for paragraph in text.splitlines():
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        current = ""
+        for char in paragraph:
+            trial = current + char
+            bbox = draw.textbbox((0, 0), trial, font=font)
+            if bbox[2] - bbox[0] <= max_width or not current:
+                current = trial
+            else:
+                lines.append(current)
+                current = char
+        if current:
+            lines.append(current)
+    return lines or [text]
+
+
+def _create_intro_card(
+    teaser: str,
+    title: str,
+    font_path: str,
+    video_size: tuple[int, int],
+) -> str:
+    width, height = video_size
+    img = Image.new("RGB", video_size, (10, 10, 10))
+    draw = ImageDraw.Draw(img)
+
+    title_font = _load_font(font_path, max(42, width // 18))
+    teaser_font = _load_font(font_path, max(52, width // 14))
+    label_font = _load_font(font_path, max(26, width // 34))
+
+    margin = int(width * 0.08)
+    max_text_width = width - margin * 2
+    teaser_lines = _wrap_by_pixels(teaser or "精彩问答马上开始", draw, teaser_font, max_text_width)
+    title_lines = _wrap_by_pixels(title or "直播精华问答", draw, title_font, max_text_width)
+
+    overlay_top = int(height * 0.18)
+    overlay_bottom = int(height * 0.82)
+    draw.rounded_rectangle(
+        [margin // 2, overlay_top, width - margin // 2, overlay_bottom],
+        radius=24,
+        fill=(0, 0, 0),
+        outline=(255, 210, 80),
+        width=4,
     )
-    draw.text((x, y), text, fill=(255, 255, 255, 255), font=font)
 
-    fd, path = tempfile.mkstemp(suffix=".png")
+    label = "前情提要"
+    label_bbox = draw.textbbox((0, 0), label, font=label_font)
+    label_w = label_bbox[2] - label_bbox[0]
+    label_h = label_bbox[3] - label_bbox[1]
+    label_x = margin
+    label_y = overlay_top + int(height * 0.04)
+    draw.rounded_rectangle(
+        [label_x - 18, label_y - 12, label_x + label_w + 18, label_y + label_h + 14],
+        radius=12,
+        fill=(255, 210, 80),
+    )
+    draw.text((label_x, label_y), label, font=label_font, fill=(0, 0, 0))
+
+    y = label_y + label_h + int(height * 0.07)
+    for line in teaser_lines[:4]:
+        bbox = draw.textbbox((0, 0), line, font=teaser_font)
+        line_w = bbox[2] - bbox[0]
+        line_h = bbox[3] - bbox[1]
+        draw.text(((width - line_w) // 2, y), line, font=teaser_font, fill=(255, 255, 255))
+        y += line_h + 18
+
+    y += int(height * 0.03)
+    for line in title_lines[:2]:
+        bbox = draw.textbbox((0, 0), line, font=title_font)
+        line_w = bbox[2] - bbox[0]
+        line_h = bbox[3] - bbox[1]
+        draw.text(((width - line_w) // 2, y), line, font=title_font, fill=(255, 230, 130))
+        y += line_h + 12
+
+    fd, path = tempfile.mkstemp(suffix=".jpg")
     os.close(fd)
-    img.save(path, "PNG")
+    img.save(path, "JPEG", quality=95)
     return path
+
+
+def _atempo_filter(speed: float) -> str:
+    if speed <= 0:
+        raise ValueError("speed must be greater than 0")
+    parts = []
+    remaining = speed
+    while remaining > 2.0:
+        parts.append("atempo=2.0")
+        remaining /= 2.0
+    while remaining < 0.5:
+        parts.append("atempo=0.5")
+        remaining /= 0.5
+    parts.append(f"atempo={remaining:.3f}")
+    return ",".join(parts)
+
+
+def _run_ffmpeg(cmd: list[str], label: str):
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=900)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"  {label} ffmpeg 失败\n  {e.stderr.decode(errors='replace')[:800]}")
+        raise
 
 
 def _process_single_block(
@@ -62,59 +150,34 @@ def _process_single_block(
     speed: float,
     font_path: str,
 ) -> dict:
-    teaser = meta["teaser"]
+    teaser = meta.get("teaser") or "精彩问答马上开始"
+    title = meta.get("title") or "直播精华问答"
 
     start = max(0, block["start_time"] - 0.5)
     end = block["end_time"]
     duration = end - start
 
     output_file = output_dir / f"part_{index + 1:02d}.mp4"
+    temp_files: list[str] = []
 
     video_pts = 1.0 / speed
-    use_drawtext = _has_drawtext()
+    video_size = _probe_video_size(video_path)
+    intro_card = _create_intro_card(teaser, title, font_path, video_size)
+    temp_files.append(intro_card)
 
-    if use_drawtext:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
-            f.write(teaser)
-            textfile = f.name
+    content_fd, content_path = tempfile.mkstemp(suffix=".mp4")
+    intro_fd, intro_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(content_fd)
+    os.close(intro_fd)
+    temp_files.extend([content_path, intro_path])
 
-        overlay_filter = (
-            f"drawtext="
-            f"textfile='{textfile}':"
-            f"fontfile='{font_path}':"
-            f"fontcolor=white:fontsize=40:"
-            f"box=1:boxcolor=black@0.6:boxborderw=10:"
-            f"x=(w-text_w)/2:y=h/4:"
-            f"enable='between(t,0,5)'"
-        )
-        inputs = [
-            "-ss", str(timedelta(seconds=start)),
-            "-i", video_path,
-            "-t", str(timedelta(seconds=duration)),
-        ]
-        filter_chain = (
-            f"[0:v]setpts={video_pts:.3f}*PTS,"
-            f"{overlay_filter}[vout];"
-            f"[0:a]atempo={speed}[aout]"
-        )
-    else:
-        overlay_path = _create_text_overlay(teaser, font_path)
-        inputs = [
-            "-ss", str(timedelta(seconds=start)),
-            "-i", video_path,
-            "-i", overlay_path,
-            "-t", str(timedelta(seconds=duration)),
-        ]
-        overlay_x, overlay_y = 0, "H/4-H/2"
-        filter_chain = (
-            f"[0:v]setpts={video_pts:.3f}*PTS[vscaled];"
-            f"[vscaled][1:v]overlay={overlay_x}:{overlay_y}:enable='between(t,0,5)'[vout];"
-            f"[0:a]atempo={speed}[aout]"
-        )
-
-    cmd = [
-        "ffmpeg", "-y", *inputs,
-        "-filter_complex", filter_chain,
+    content_cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(timedelta(seconds=start)),
+        "-i", video_path,
+        "-t", str(timedelta(seconds=duration)),
+        "-filter_complex",
+        f"[0:v]setpts={video_pts:.3f}*PTS[vout];[0:a]{_atempo_filter(speed)}[aout]",
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264",
@@ -123,29 +186,56 @@ def _process_single_block(
         "-c:a", "aac",
         "-b:a", "128k",
         "-avoid_negative_ts", "make_zero",
+        content_path,
+    ]
+
+    intro_cmd = [
+        "ffmpeg", "-y",
+        "-loop", "1",
+        "-i", intro_card,
+        "-f", "lavfi",
+        "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        "-t", "3.2",
+        "-vf", "format=yuv420p",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "20",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-shortest",
+        intro_path,
+    ]
+
+    concat_cmd = [
+        "ffmpeg", "-y",
+        "-i", intro_path,
+        "-i", content_path,
+        "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[vout][aout]",
+        "-map", "[vout]",
+        "-map", "[aout]",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
         str(output_file),
     ]
 
     try:
-        subprocess.run(cmd, check=True, capture_output=True, timeout=600)
-    except subprocess.CalledProcessError as e:
-        logger.error(f"  切片 {index + 1} ffmpeg 失败\n  {e.stderr.decode()[:500]}")
-        raise
+        _run_ffmpeg(content_cmd, f"切片 {index + 1} 内容")
+        _run_ffmpeg(intro_cmd, f"切片 {index + 1} 前情提要")
+        _run_ffmpeg(concat_cmd, f"切片 {index + 1} 合成")
     finally:
-        if use_drawtext:
+        for temp_file in temp_files:
             try:
-                os.unlink(textfile)
-            except OSError:
-                pass
-        else:
-            try:
-                os.unlink(overlay_path)
+                os.unlink(temp_file)
             except OSError:
                 pass
 
     return {
         "index": index + 1,
-        "title": meta["title"],
+        "title": title,
+        "teaser": teaser,
         "crowd": meta.get("crowd", ""),
         "problem": meta.get("problem", ""),
         "solution": meta.get("solution", ""),
@@ -199,6 +289,7 @@ def save_manifest(titles: list[dict], output_dir: Path):
         for item in titles:
             f.write(
                 f"P{item['index']:02d} | {item['title']}\n"
+                f"      前情提要: {item.get('teaser', '')}\n"
                 f"      人群: {item['crowd']} | 问题: {item['problem']} | 解法: {item['solution']}\n"
                 f"      文件: {item['file']}\n\n"
             )

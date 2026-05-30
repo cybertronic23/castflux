@@ -6,7 +6,7 @@ logger = logging.getLogger("castflux")
 
 def find_qa_blocks(
     segments: list[dict],
-    target_count: int = 10,
+    target_count: int | None = None,
     host_speaker: str | None = None,
 ) -> list[dict]:
     speaker_counts = Counter(s["speaker"] for s in segments if s["speaker"] != "UNKNOWN")
@@ -49,6 +49,10 @@ def find_qa_blocks(
 
     if not qa_blocks:
         raise RuntimeError("未检测到任何 QA 对，无法继续")
+
+    if not target_count or target_count <= 0:
+        logger.info(f"  自动模式: 使用全部 {len(qa_blocks)} 个 QA 对")
+        return qa_blocks
 
     if len(qa_blocks) <= target_count:
         logger.warning(f"  仅 {len(qa_blocks)} 个 QA 对 (目标 {target_count})，全部使用")
