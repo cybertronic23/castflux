@@ -61,6 +61,55 @@ function Test-ExecutableFile([string]$Path) {
     return (Test-Path $Path -PathType Leaf)
 }
 
+function Find-PythonExeCandidate {
+    $Candidates = New-Object System.Collections.Generic.List[string]
+
+    function Add-PythonCandidate([string]$Path) {
+        if ($Path) {
+            [void]$Candidates.Add($Path)
+        }
+    }
+
+    function Add-PythonCandidateFromRoot([string]$Root) {
+        if ($Root) {
+            Add-PythonCandidate (Join-Path $Root "Python311\python.exe")
+        }
+    }
+
+    Add-PythonCandidate $PythonExe
+    Add-PythonCandidateFromRoot (Join-Path $env:LOCALAPPDATA "Programs\Python")
+    Add-PythonCandidateFromRoot $env:ProgramFiles
+    Add-PythonCandidateFromRoot ${env:ProgramFiles(x86)}
+
+    $RegistryRoots = @(
+        "HKCU:\Software\Python\PythonCore\3.11\InstallPath",
+        "HKLM:\Software\Python\PythonCore\3.11\InstallPath",
+        "HKLM:\Software\WOW6432Node\Python\PythonCore\3.11\InstallPath"
+    )
+    foreach ($Root in $RegistryRoots) {
+        try {
+            $Key = Get-Item -Path $Root -ErrorAction Stop
+            $InstallPath = $Key.GetValue("")
+            if ($InstallPath) {
+                Add-PythonCandidate (Join-Path $InstallPath "python.exe")
+            }
+            $ExecutablePath = $Key.GetValue("ExecutablePath")
+            if ($ExecutablePath) {
+                Add-PythonCandidate $ExecutablePath
+            }
+        } catch {
+            # Registry key may not exist; keep searching other locations.
+        }
+    }
+
+    foreach ($Candidate in ($Candidates | Select-Object -Unique)) {
+        if (Test-ExecutableFile $Candidate) {
+            return $Candidate
+        }
+    }
+    return $null
+}
+
 function Install-PrivatePython {
     $InstallerPath = Join-Path $DownloadDir "python-$PythonVersion-amd64.exe"
     if (-not (Test-ExecutableFile $InstallerPath)) {
@@ -77,13 +126,13 @@ function Install-PrivatePython {
         "/quiet",
         "InstallAllUsers=0",
         "TargetDir=`"$PythonDir`"",
+        "DefaultJustForMeTargetDir=`"$PythonDir`"",
         "Include_pip=1",
         "Include_tcltk=1",
         "Include_launcher=0",
         "Include_test=0",
         "PrependPath=0",
         "Shortcuts=0",
-        "SimpleInstall=1",
         "/log",
         "`"$PythonInstallLog`""
     ) -join " "
@@ -94,12 +143,21 @@ function Install-PrivatePython {
     Assert-CommandSucceeded "Python installer" $Process.ExitCode
 
     if (-not (Test-ExecutableFile $PythonExe)) {
-        $FoundPython = Get-ChildItem $PythonDir -Recurse -Filter "python.exe" -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notlike "*\Scripts\python.exe" } |
-            Select-Object -First 1
+        $FoundPython = $null
+        if (Test-Path $PythonDir) {
+            $FoundPython = Get-ChildItem $PythonDir -Recurse -Filter "python.exe" -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -notlike "*\Scripts\python.exe" } |
+                Select-Object -First 1
+        }
         if ($FoundPython) {
             Write-Host "  Found Python at non-standard path: $($FoundPython.FullName)" -ForegroundColor Yellow
             $script:PythonExe = $FoundPython.FullName
+        } else {
+            $Candidate = Find-PythonExeCandidate
+            if ($Candidate) {
+                Write-Host "  Found Python installed outside runtime: $Candidate" -ForegroundColor Yellow
+                $script:PythonExe = $Candidate
+            }
         }
     }
 
