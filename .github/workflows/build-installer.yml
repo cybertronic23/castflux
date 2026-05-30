@@ -22,6 +22,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+
       - name: Build installer
         shell: pwsh
         run: |
