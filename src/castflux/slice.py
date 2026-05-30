@@ -263,14 +263,16 @@ def _render_clip(
     label: str,
 ):
     duration = max(0.1, end - start)
-    video_pts = 1.0 / speed
     cmd = [
         "ffmpeg", "-y",
         "-ss", str(timedelta(seconds=start)),
-        "-i", video_path,
         "-t", str(timedelta(seconds=duration)),
+        "-i", video_path,
         "-filter_complex",
-        f"[0:v]setpts={video_pts:.3f}*PTS[vout];[0:a]{_atempo_filter(speed)}[aout]",
+        (
+            f"[0:v]setpts=(PTS-STARTPTS)/{speed:.6f}[vout];"
+            f"[0:a]asetpts=PTS-STARTPTS,{_atempo_filter(speed)}[aout]"
+        ),
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264",
