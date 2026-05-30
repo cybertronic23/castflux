@@ -1,6 +1,6 @@
 [project]
 name = "castflux"
-version = "1.0.8"
+version = "1.0.9"
 description = "直播内容切片流水线——自动提取问答片段，生成爆款短视频"
 requires-python = ">=3.10"
 license = "MIT"
@@ -16,6 +16,10 @@ dependencies = [
 [project.scripts]
 castflux = "castflux.pipeline:main"
 castflux-gui = "castflux.gui:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]

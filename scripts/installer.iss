@@ -3,7 +3,7 @@
 
 #define MyAppName "CastFlux"
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.8"
+#define MyAppVersion "1.0.9"
 #endif
 #define MyAppPublisher "cybertronic23"
 #define MyAppURL "https://github.com/cybertronic23/castflux"

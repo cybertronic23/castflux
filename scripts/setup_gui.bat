@@ -8,7 +8,10 @@ echo   CastFlux Setup
 echo ============================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0windows_bootstrap.ps1" %*
+set "PS_ARGS=%*"
+if /I "%~1"=="--installer" set "PS_ARGS=-Installer"
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0windows_bootstrap.ps1" %PS_ARGS%
 set "SETUP_RC=%ERRORLEVEL%"
 
 if not "%SETUP_RC%"=="0" (
